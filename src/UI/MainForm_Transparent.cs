@@ -1,3 +1,5 @@
+using LiteMonitor.src.Core;
+using LiteMonitor.src.System;
 using System;
 using System.Drawing;
 using System.IO;
@@ -220,7 +222,7 @@ namespace LiteMonitor
             }
 
             // ✅ 启动时静默检查更新（不打扰用户）
-            _ = LiteMonitor.UpdateChecker.CheckAsync();
+            _ = UpdateChecker.CheckAsync();
         }
 
 

@@ -5,7 +5,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace LiteMonitor
+namespace LiteMonitor.src.System
 {
     public static class UpdateChecker
     {

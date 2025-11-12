@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using LiteMonitor.src.Core;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;

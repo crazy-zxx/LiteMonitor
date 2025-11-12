@@ -1,3 +1,5 @@
+using LiteMonitor.src.Core;
+using LiteMonitor.src.System;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
