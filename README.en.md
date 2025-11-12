@@ -1,7 +1,7 @@
 [中文文档](./README.md)
 
 
-# ⚡ LiteMonitor
+# <img src="./screenshots/logo.png" width="28" style="vertical-align: -6px;" /> LiteMonitor
 A lightweight and customizable **Windows hardware monitor** — track your CPU, GPU, memory, disk, and network stats in real time.
 
 > 🟢 **Download the latest version:** [📦 GitHub Releases → LiteMonitor Latest](https://github.com/Diorser/LiteMonitor/releases/latest)

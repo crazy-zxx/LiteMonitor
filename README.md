@@ -1,6 +1,6 @@
 [English](./README.en.md)
 
-# ⚡ LiteMonitor
+# <img src="./screenshots/logo.png" width="28" style="vertical-align: -6px;" /> LiteMonitor
 轻量、可定制的桌面硬件监控工具 — 实时监测 CPU、GPU、内存、磁盘、网络等系统性能。
 
 > 🟢 **立即下载最新版本：** [📦 GitHub Releases → LiteMonitor 最新版](https://github.com/Diorser/LiteMonitor/releases/latest)
