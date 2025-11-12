@@ -1,7 +1,11 @@
 [中文文档](./README.md)
 
+
 # ⚡ LiteMonitor
 A lightweight and customizable **Windows hardware monitor** — track your CPU, GPU, memory, disk, and network stats in real time.
+
+> 🟢 **Download the latest version:** [📦 GitHub Releases → LiteMonitor Latest](https://github.com/Diorser/LiteMonitor/releases/latest)
+
 
 ![LiteMonitor Overview](./screenshots/overview.png)
 
@@ -22,21 +26,25 @@ It offers smooth animations, theme customization, transparency control, and mult
 
 ---
 
-## ⚙️ Product Features
+# Product Features
 
 | Feature | Description |
-|----------|-------------|
-| 🌍 Multilingual Interface | 8 languages supported (Chinese, English, Japanese, Korean, French, German, Spanish, Russian) |
-| 🎨 Theme System | JSON-defined themes with customizable colors, fonts, padding, and corner radius |
-| 🪟 Window & UI | Rounded corners, adjustable transparency, click-through support, and “Always on top” |
-| 📏 Adjustable Width | Instantly change panel width via menu |
-| 💫 Smooth Animation | Adjustable animation speed for smooth value transitions |
-| 🧩 Real-time Theme & Language Switch | Changes apply immediately without restart |
-| 🔠 DPI Scaling | Auto font scaling for high-resolution displays |
-| ⚙️ Auto-Save Settings | All menu changes saved in real time to settings.json |
-| 🚀 Auto Start | Launches via Windows Task Scheduler with admin privileges |
-| 🔄 Update Check | Automatically detects new versions from GitHub |
-| ℹ️ About Window | Displays version, author, and project information |
+|---|---|
+| 🎨 Theme Customization | JSON-defined colors, fonts, spacing, and corner radius; themes are extensible and reusable. |
+| 🌍 Multilingual UI | Supports 8 languages (Chinese, English, Japanese, Korean, French, German, Spanish, Russian). Language switch takes effect instantly without restart. |
+| 📊 Show/Hide Monitoring Items | Selectively display CPU, GPU, Memory, Disk, and Network modules to focus on what matters. |
+| 📏 Adjustable Width | Change panel width from the context menu; layout adapts instantly with no restart. |
+| 🪟 Window & UI | Rounded corners, adjustable opacity, “Always on top”, drop shadow, and high-quality text rendering. |
+| 🧭 Auto Hide at Screen Edge | Auto-collapses when docked to the edge; reappears on hover to save desktop space. |
+| 👆 Click-Through Mode | Lets mouse clicks pass through the panel for seamless interaction with underlying apps. |
+| 💫 Smooth Animation | Tunable transition speed for stable, jitter-free value changes. |
+| 🧩 Real-time Theme/Language Switch | Switching applies immediately without requiring a restart. |
+| 🔠 DPI Scaling | Fonts and layout automatically adapt to system scaling; crisp on high-DPI displays. |
+| 📂 Auto-Save Settings | Changes (opacity, theme, language, shown items, etc.) are saved instantly to `settings.json`. |
+| 🚀 Auto Start | Launches via Windows Task Scheduler; supports elevated privileges. |
+| 🔄 Auto Update Check | Fetches the latest version info and prompts to download releases. |
+| ⚙️ Configuration Storage | Centralized user preferences in `settings.json` for easy migration and backup. |
+
 
 ---
 
