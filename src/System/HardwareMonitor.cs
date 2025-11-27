@@ -3,11 +3,27 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using LibreHardwareMonitor.Hardware;
+using System.Threading.Tasks; // 确保引入 Task
 
 namespace LiteMonitor.src.System
 {
     public sealed class HardwareMonitor : IDisposable
     {
+        // =======================================================================
+        // [新增] 线程安全锁与智能缓存字段
+        // =======================================================================
+        private readonly object _lock = new object(); // 核心锁：保护 _map 和 _lastValid
+
+        // 网络硬件缓存 (CPU 优化)
+        private IHardware? _cachedNetHw;
+        private DateTime _lastNetScan = DateTime.MinValue;
+
+        // 磁盘硬件缓存 (CPU 优化)
+        private IHardware? _cachedDiskHw;
+        private DateTime _lastDiskScan = DateTime.MinValue;
+
+        // =======================================================================
+
         private readonly Computer _computer;
         private readonly Dictionary<string, ISensor> _map = new();
         private readonly Dictionary<string, float> _lastValid = new();
@@ -52,17 +68,42 @@ namespace LiteMonitor.src.System
         // ===========================================================
         // ========== Sensor Map 建立（CPU/GPU/MEM） ================
         // ===========================================================
+        // [修改说明] 重构为线程安全版本：先局部构建，再加锁交换，防止 UI 读取时崩溃
         private void BuildSensorMap()
         {
-            _map.Clear();
+            // 1. 创建临时字典 (局部变量，线程安全)
+            var newMap = new Dictionary<string, ISensor>();
+
+            // 定义局部递归函数，替代原有的 RegisterHardware
+            void RegisterTo(IHardware hw)
+            {
+                hw.Update();
+
+                foreach (var s in hw.Sensors)
+                {
+                    string? key = NormalizeKey(hw, s);
+                    // 使用临时字典 newMap
+                    if (!string.IsNullOrEmpty(key) && !newMap.ContainsKey(key))
+                        newMap[key] = s;
+                }
+
+                foreach (var sub in hw.SubHardware)
+                    RegisterTo(sub);
+            }
 
             // ⭐ 按优先级排序：独显(GpuNvidia > GpuAmd) > 核显(GpuIntel) > 其他
             var ordered = _computer.Hardware.OrderBy(h => GetHwPriority(h));
 
             foreach (var hw in ordered)
-                RegisterHardware(hw);
+                RegisterTo(hw);
 
-            _lastMapBuild = DateTime.Now;
+            // 2. 仅在数据交换瞬间加锁
+            lock (_lock)
+            {
+                _map.Clear();
+                foreach (var kv in newMap) _map[kv.Key] = kv.Value;
+                _lastMapBuild = DateTime.Now;
+            }
         }
 
         private static int GetHwPriority(IHardware hw)
@@ -76,39 +117,27 @@ namespace LiteMonitor.src.System
             };
         }
 
-        private void RegisterHardware(IHardware hw)
-        {
-            hw.Update();
+        // [注意] 原 RegisterHardware 方法已整合进 BuildSensorMap 的局部函数 RegisterTo 中，故移除
 
-            foreach (var s in hw.Sensors)
-            {
-                string? key = NormalizeKey(hw, s);
-                if (!string.IsNullOrEmpty(key) && !_map.ContainsKey(key))
-                    _map[key] = s;
-            }
-
-            foreach (var sub in hw.SubHardware)
-                RegisterHardware(sub);
-        }
-
+        // [修改说明] 移除 ToLower()，使用 Has() 进行零内存分配匹配，保留原始逻辑
         private static string? NormalizeKey(IHardware hw, ISensor s)
         {
-            string name = s.Name.ToLower();
+            string name = s.Name; // [优化] 移除 ToLower()，减少 GC
             var type = hw.HardwareType;
 
             // ========== CPU ==========
             if (type == HardwareType.Cpu)
             {
-                if (s.SensorType == SensorType.Load && name.Contains("total"))
+                if (s.SensorType == SensorType.Load && Has(name, "total"))
                     return "CPU.Load";
 
                 if (s.SensorType == SensorType.Temperature)
                 {
-                    if (name.Contains("average") || name.Contains("core average"))
+                    if (Has(name, "average") || Has(name, "core average"))
                         return "CPU.Temp";
-                    if (name.Contains("package") || name.Contains("tctl"))
+                    if (Has(name, "package") || Has(name, "tctl"))
                         return "CPU.Temp";
-                     if (name.Contains("cores"))
+                    if (Has(name, "cores"))
                         return "CPU.Temp";
                 }
             }
@@ -116,32 +145,32 @@ namespace LiteMonitor.src.System
             // ========== GPU ==========
             if (type is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel)
             {
-                  if (s.SensorType == SensorType.Load &&
-                    (name.Contains("core") || name.Contains("d3d 3d")))
+                if (s.SensorType == SensorType.Load &&
+                  (Has(name, "core") || Has(name, "d3d 3d")))
                     return "GPU.Load";
 
                 if (s.SensorType == SensorType.Temperature &&
-                    (name.Contains("core") || name.Contains("hot spot")
-                    || name.Contains("gpu vr soc") // 集成显卡核心温度
+                    (Has(name, "core") || Has(name, "hot spot") // [保留] 原有热点逻辑
+                    || Has(name, "gpu vr soc") // 集成显卡核心温度
                     ))
                     return "GPU.Temp";
 
                 if (s.SensorType == SensorType.SmallData)
                 {
-                    if ((name.Contains("memory") || name.Contains("dedicated")) && name.Contains("used"))
+                    if ((Has(name, "memory") || Has(name, "dedicated")) && Has(name, "used"))
                         return "GPU.VRAM.Used";
-                    if ((name.Contains("memory") || name.Contains("dedicated")) && name.Contains("total"))
+                    if ((Has(name, "memory") || Has(name, "dedicated")) && Has(name, "total"))
                         return "GPU.VRAM.Total";
                 }
 
-                if (s.SensorType == SensorType.Load && name.Contains("memory"))
+                if (s.SensorType == SensorType.Load && Has(name, "memory"))
                     return "GPU.VRAM.Load";
             }
 
             // ========== Memory ==========
             if (type == HardwareType.Memory)
             {
-                if (s.SensorType == SensorType.Load && name.Contains("memory"))
+                if (s.SensorType == SensorType.Load && Has(name, "memory"))
                     return "MEM.Load";
             }
 
@@ -157,6 +186,7 @@ namespace LiteMonitor.src.System
         // ===========================================================
         // ===================== 核心 Get ============================
         // ===========================================================
+        // [修改说明] 增加 lock (_lock) 保护字典读取
         public float? Get(string key)
         {
             EnsureMapFresh();
@@ -175,6 +205,7 @@ namespace LiteMonitor.src.System
             // ===== GPU VRAM 额外计算 =====
             if (key == "GPU.VRAM")
             {
+                // 递归调用 Get，内部会自动加锁，所以这里不需要显式锁
                 float? used = Get("GPU.VRAM.Used");
                 float? total = Get("GPU.VRAM.Total");
                 if (used.HasValue && total.HasValue && total > 0)
@@ -186,21 +217,30 @@ namespace LiteMonitor.src.System
                     }
                     return used / total * 100f;
                 }
-                if (_map.TryGetValue("GPU.VRAM.Load", out var s) && s.Value.HasValue)
-                    return s.Value;
+                
+                // 直接读取 _map 需要加锁
+                lock (_lock)
+                {
+                    if (_map.TryGetValue("GPU.VRAM.Load", out var s) && s.Value.HasValue)
+                        return s.Value;
+                }
+                return null;
             }
 
-            // ===== 普通传感器 =====
-            if (_map.TryGetValue(key, out var sensor))
+            // ===== 普通传感器 (加锁保护) =====
+            lock (_lock)
             {
-                var val = sensor.Value;
-                if (val.HasValue && !float.IsNaN(val.Value))
+                if (_map.TryGetValue(key, out var sensor))
                 {
-                    _lastValid[key] = val.Value;
-                    return val.Value;
+                    var val = sensor.Value;
+                    if (val.HasValue && !float.IsNaN(val.Value))
+                    {
+                        _lastValid[key] = val.Value;
+                        return val.Value;
+                    }
+                    if (_lastValid.TryGetValue(key, out var last))
+                        return last;
                 }
-                if (_lastValid.TryGetValue(key, out var last))
-                    return last;
             }
 
             return null;
@@ -229,6 +269,7 @@ namespace LiteMonitor.src.System
         }
 
         // --- 帮助函数：从指定网卡读取 Up/Down ---
+        // [修改说明] 使用 Has 优化，且在读写 _lastValid 时加锁
         private float? ReadNetworkSensor(IHardware hw, string key)
         {
             ISensor? up = null;
@@ -238,22 +279,25 @@ namespace LiteMonitor.src.System
             {
                 if (s.SensorType != SensorType.Throughput) continue;
 
-                string sn = s.Name.ToLower();
+                string sn = s.Name; // 原为 ToLower()，现优化
 
-                if (_upKW.Any(k => sn.Contains(k))) up ??= s;
-                if (_downKW.Any(k => sn.Contains(k))) down ??= s;
+                if (_upKW.Any(k => Has(sn, k))) up ??= s;
+                if (_downKW.Any(k => Has(sn, k))) down ??= s;
             }
 
             ISensor? t = key == "NET.Up" ? up : down;
 
             if (t?.Value is float v && !float.IsNaN(v))
             {
-                _lastValid[key] = v;
+                lock (_lock) _lastValid[key] = v; // 加锁写入
                 return v;
             }
 
-            if (_lastValid.TryGetValue(key, out var last))
-                return last;
+            lock (_lock) // 加锁读取
+            {
+                if (_lastValid.TryGetValue(key, out var last))
+                    return last;
+            }
 
             return null;
         }
@@ -268,16 +312,35 @@ namespace LiteMonitor.src.System
         };
 
         // --- 自动：选择最活跃网卡 ---
-        private float? GetBestNetworkValue(string key)
+        // [修改说明] 引入智能缓存策略，使用 Has 优化，加锁写入
+               private float? GetBestNetworkValue(string key)
         {
+            // 1. 尝试使用缓存
+            if (_cachedNetHw != null)
+            {
+                float? cachedVal = ReadNetworkSensor(_cachedNetHw, key); // ★ 改名 v -> cachedVal
+                
+                // 如果有流量(>0)，说明它活跃，无需扫描，续期缓存
+                if (cachedVal.HasValue && cachedVal.Value > 0.1f)
+                {
+                    _lastNetScan = DateTime.Now;
+                    return cachedVal;
+                }
+                // 如果无流量，但距离上次扫描不足10秒，也不扫描 (冷却期)
+                if ((DateTime.Now - _lastNetScan).TotalSeconds < 10)
+                    return cachedVal;
+            }
+
+            // 2. 全盘扫描 (代码保持不变)
             ISensor? bestUp = null;
             ISensor? bestDown = null;
             double bestScore = double.MinValue;
+            IHardware? bestHw = null;
 
             foreach (var hw in _computer.Hardware.Where(h => h.HardwareType == HardwareType.Network))
             {
-                string lname = hw.Name.ToLower();
-                double penalty = _virtualNicKW.Any(v => lname.Contains(v)) ? -1e9 : 0;
+                string lname = hw.Name;
+                double penalty = _virtualNicKW.Any(val => Has(lname, val)) ? -1e9 : 0; // ★ lambda变量改名 v -> val
 
                 ISensor? up = null;
                 ISensor? down = null;
@@ -286,40 +349,47 @@ namespace LiteMonitor.src.System
                 {
                     if (s.SensorType != SensorType.Throughput) continue;
 
-                    string sn = s.Name.ToLower();
-
-                    if (_upKW.Any(k => sn.Contains(k))) up ??= s;
-                    if (_downKW.Any(k => sn.Contains(k))) down ??= s;
+                    string sn = s.Name;
+                    if (_upKW.Any(k => Has(sn, k))) up ??= s;
+                    if (_downKW.Any(k => Has(sn, k))) down ??= s;
                 }
 
-                if (up == null && down == null)
-                    continue;
+                if (up == null && down == null) continue;
 
-                double upVal = up?.Value ?? 0;
-                double downVal = down?.Value ?? 0;
-                double score = upVal + downVal + penalty;
+                double score = (up?.Value ?? 0) + (down?.Value ?? 0) + penalty;
 
                 if (score > bestScore)
                 {
                     bestScore = score;
                     bestUp = up;
                     bestDown = down;
+                    bestHw = hw;
                 }
+            }
+
+            // 3. 更新缓存
+            if (bestHw != null)
+            {
+                _cachedNetHw = bestHw;
+                _lastNetScan = DateTime.Now;
             }
 
             ISensor? t = key == "NET.Up" ? bestUp : bestDown;
 
-            if (t?.Value is float v && !float.IsNaN(v))
+            // 4. 线程安全返回 (这里的 v 可以保留，因为 cachedVal 作用域在 if 里面，不冲突了，但为了保险起见)
+            if (t?.Value is float finalVal && !float.IsNaN(finalVal)) // ★ 改名 v -> finalVal
             {
-                _lastValid[key] = v;
-                return v;
+                lock (_lock) _lastValid[key] = finalVal;
+                return finalVal;
             }
 
-            if (_lastValid.TryGetValue(key, out var last))
-                return last;
-
+            lock (_lock)
+            {
+                if (_lastValid.TryGetValue(key, out var last)) return last;
+            }
             return null;
         }
+
 
         // ===========================================================
         // =============== 手动 / 自动 — 磁盘 =========================
@@ -342,6 +412,7 @@ namespace LiteMonitor.src.System
         }
 
         // --- 帮助：从指定磁盘读取 ---
+        // [修改说明] 使用 Has 优化，加锁保护
         private float? ReadDiskSensor(IHardware hw, string key)
         {
             ISensor? read = null;
@@ -351,86 +422,84 @@ namespace LiteMonitor.src.System
             {
                 if (s.SensorType != SensorType.Throughput) continue;
 
-                string sn = s.Name.ToLower();
-                if (sn.Contains("read")) read ??= s;
-                if (sn.Contains("write")) write ??= s;
+                string sn = s.Name; // 原为 ToLower
+                if (Has(sn, "read")) read ??= s;
+                if (Has(sn, "write")) write ??= s;
             }
 
             ISensor? t = key == "DISK.Read" ? read : write;
 
             if (t?.Value is float v && !float.IsNaN(v))
             {
-                _lastValid[key] = v;
+                lock (_lock) _lastValid[key] = v; // 加锁
                 return v;
             }
 
-            if (_lastValid.TryGetValue(key, out var last))
-                return last;
+            lock (_lock) // 加锁
+            {
+                if (_lastValid.TryGetValue(key, out var last))
+                    return last;
+            }
 
             return null;
         }
 
         // --- 自动：系统盘优先 + 活跃度 ---
-        private float? GetBestDiskValue(string key)
+        // [修改说明] 引入智能缓存策略，使用 Has 优化，加锁写入
+               private float? GetBestDiskValue(string key)
         {
-            char? sys = null;
-            try
+            // 1. 尝试使用缓存
+            if (_cachedDiskHw != null)
             {
+                float? cachedVal = ReadDiskSensor(_cachedDiskHw, key); // ★ 改名 v -> cachedVal
+                if (cachedVal.HasValue && cachedVal.Value > 0.1f)
+                {
+                    _lastDiskScan = DateTime.Now;
+                    return cachedVal;
+                }
+                if ((DateTime.Now - _lastDiskScan).TotalSeconds < 10)// 冷却期10秒
+                    return cachedVal;
+            }
+
+            // 2. 全盘扫描
+            string sysStr = "";
+            try {
                 string path = Environment.SystemDirectory;
                 string root = Path.GetPathRoot(path);
-                if (!string.IsNullOrEmpty(root))
-                    sys = char.ToUpperInvariant(root[0]);
-            }
-            catch { }
+                if (!string.IsNullOrEmpty(root)) sysStr = root.Substring(0, 2);
+            } catch { }
 
             ISensor? bestRead = null;
             ISensor? bestWrite = null;
             double bestScore = double.MinValue;
+            IHardware? bestHw = null;
 
             foreach (var hw in _computer.Hardware.Where(h => h.HardwareType == HardwareType.Storage))
             {
                 bool isSystemDisk = false;
-                string lname = hw.Name.ToLower();
-                string sysStr = sys.HasValue ? $"{sys.Value.ToString().ToLower()}:" : "";
+                string lname = hw.Name;
 
                 if (sysStr != "")
                 {
-                    if (lname.Contains(sysStr))
-                        isSystemDisk = true;
-                    else
-                    {
-                        foreach (var s in hw.Sensors)
-                        {
-                            if (s.Name.ToLower().Contains(sysStr))
-                            {
-                                isSystemDisk = true;
-                                break;
-                            }
-                        }
+                    if (Has(lname, sysStr)) isSystemDisk = true;
+                    else {
+                        foreach(var s in hw.Sensors) 
+                            if(Has(s.Name, sysStr)) { isSystemDisk = true; break; }
                     }
                 }
 
                 ISensor? read = null;
                 ISensor? write = null;
-
                 foreach (var s in hw.Sensors)
                 {
-                    if (s.SensorType != SensorType.Throughput)
-                        continue;
-
-                    string sn = s.Name.ToLower();
-                    if (sn.Contains("read")) read ??= s;
-                    if (sn.Contains("write")) write ??= s;
+                    if (s.SensorType != SensorType.Throughput) continue;
+                    string sn = s.Name;
+                    if (Has(sn, "read")) read ??= s;
+                    if (Has(sn, "write")) write ??= s;
                 }
 
-                if (read == null && write == null)
-                    continue;
-
-                double rVal = read?.Value ?? 0;
-                double wVal = write?.Value ?? 0;
-                double activity = rVal + wVal;
-
-                double score = activity;
+                if (read == null && write == null) continue;
+                double score = (read?.Value ?? 0) + (write?.Value ?? 0);
                 if (isSystemDisk) score += 1e9;
 
                 if (score > bestScore)
@@ -438,20 +507,27 @@ namespace LiteMonitor.src.System
                     bestScore = score;
                     bestRead = read;
                     bestWrite = write;
+                    bestHw = hw;
                 }
+            }
+
+            // 3. 更新缓存
+            if (bestHw != null)
+            {
+                _cachedDiskHw = bestHw;
+                _lastDiskScan = DateTime.Now;
             }
 
             ISensor? t = key == "DISK.Read" ? bestRead : bestWrite;
 
-            if (t?.Value is float v && !float.IsNaN(v))
+            // 4. 线程安全返回
+            if (t?.Value is float finalVal && !float.IsNaN(finalVal)) // ★ 改名 v -> finalVal
             {
-                _lastValid[key] = v;
-                return v;
+                lock (_lock) _lastValid[key] = finalVal;
+                return finalVal;
             }
 
-            if (_lastValid.TryGetValue(key, out var last))
-                return last;
-
+            lock (_lock) { if (_lastValid.TryGetValue(key, out var last)) return last; }
             return null;
         }
 
@@ -502,5 +578,12 @@ namespace LiteMonitor.src.System
         }
 
         public void Dispose() => _computer.Close();
+
+        // [新增] 高性能字符串包含检查（辅助方法）
+        private static bool Has(string source, string sub)
+        {
+            if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(sub)) return false;
+            return source.IndexOf(sub, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
     }
 }

@@ -404,6 +404,16 @@ namespace LiteMonitor
 
         protected override void OnPaint(PaintEventArgs e) => _ui?.Render(e.Graphics);
 
+        /// <summary>
+        /// DPI变化时重新计算布局
+        /// </summary>
+        protected override void OnDpiChanged(DpiChangedEventArgs e)
+        {
+            base.OnDpiChanged(e);
+            // DPI变化时重新应用主题以适配新DPI
+            _ui?.ApplyTheme(_cfg.Skin);
+        }
+
         private void SavePos()
         {
             ClampToScreen(); // ★ 新增：确保保存前被校正

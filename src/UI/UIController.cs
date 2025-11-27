@@ -24,6 +24,8 @@ namespace LiteMonitor
         private List<Column> _hxColsTaskbar = new();
         private HorizontalLayout? _hxLayout;
         public MainForm MainForm => (MainForm)_form;
+       
+
 
         // 任务栏模式：公开横版列数据（只读引用）
         public List<Column> GetTaskbarColumns() => _hxColsTaskbar;
@@ -48,7 +50,13 @@ namespace LiteMonitor
             ApplyTheme(_cfg.Skin);
         }
 
-
+        public float GetCurrentDpiScale()
+        {
+            using (Graphics g = _form.CreateGraphics())
+            {
+                return g.DpiX / 96f;
+            }
+        }
 
         /// <summary>
         /// 真·换主题时调用
@@ -64,7 +72,8 @@ namespace LiteMonitor
             var t = ThemeManager.Current;
 
             // ========== DPI 处理 ==========
-            float dpiScale = _form.DeviceDpi / 96f;   // 系统标准 DPI 为 96
+            
+            float dpiScale = GetCurrentDpiScale();   // 系统DPI
             float userScale = (float)_cfg.UIScale;    // 用户自定义缩放
             float finalScale = dpiScale * userScale;
 
@@ -82,6 +91,9 @@ namespace LiteMonitor
 
             // 重建竖屏布局对象
             _layout = new UILayout(t);
+
+            // ★★ 新增：强制重建横屏布局对象（DPI变化时需要重新计算）
+            _hxLayout = null;
 
             // 重建指标数据
             BuildMetrics();
