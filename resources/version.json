@@ -1,6 +1,6 @@
 {
-  "version": "1.0.5",
-  "changelog": "新增任务栏显示/横屏模式等多个功能。",
-  "releaseDate": "2025-11-25",
+  "version": "1.0.6",
+  "changelog": "新增网络测速/隐藏托盘图标隐藏等多个功能。",
+  "releaseDate": "2025-11-27",
   "downloadUrl": "https://github.com/Diorser/LiteMonitor/releases"
 }
