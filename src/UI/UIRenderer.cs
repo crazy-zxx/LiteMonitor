@@ -21,7 +21,12 @@ namespace LiteMonitor
             return br;
         }
 
-        public static void ClearCache() => _brushCache.Clear();
+        // [替换] ClearCache 方法
+        public static void ClearCache() 
+        {
+            foreach(var b in _brushCache.Values) b.Dispose(); // 新增
+            _brushCache.Clear();
+        }
 
         public static void Render(Graphics g, List<GroupLayoutInfo> groups, Theme t)
         {

@@ -230,7 +230,6 @@ namespace LiteMonitor.src.Core
             {
                 return Directory.EnumerateFiles(ThemeDir, "*.json")
                                 .Select(Path.GetFileNameWithoutExtension)
-                                .Where(n => n != null)
                                 .OrderBy(n => n)
                                 .ToArray();
             }

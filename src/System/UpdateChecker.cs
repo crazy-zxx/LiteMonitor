@@ -14,7 +14,7 @@ namespace LiteMonitor.src.System
             "https://raw.githubusercontent.com/Diorser/LiteMonitor/master/resources/version.json";
 
         private const string ChinaUrl =
-            "https://litemonitor.piczip.cn/update/version.json";
+            "https://litemonitor.cn/update/version.json";
 
         public static async Task CheckAsync(bool showMessage = false)
         {

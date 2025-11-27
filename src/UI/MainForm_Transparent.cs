@@ -351,6 +351,18 @@ namespace LiteMonitor
             RebuildMenus();
         }
 
+        // ========== 隐藏托盘图标 ==========
+        public void HideTrayIcon()
+        {
+            _tray.Visible = false;
+        }
+
+        // ========== 显示托盘图标 ==========
+        public void ShowTrayIcon()
+        {
+            _tray.Visible = true;
+        }
+
 
 
         // ========== 菜单选项更改后重建菜单 ==========

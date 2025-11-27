@@ -205,8 +205,11 @@ namespace LiteMonitor
 
         private void Tick()
         {
-            // 1. 检查主题是否改变，如果改变会自动更新背景色 Key
-            CheckTheme();
+            // 每5秒检查一次主题变化（比每秒检查效率高很多）
+            if (Environment.TickCount % 5000 < _cfg.RefreshMs)
+            {
+                CheckTheme();
+            }
 
             _cols = _ui.GetTaskbarColumns();
             if (_cols == null || _cols.Count == 0) return;
@@ -409,7 +412,7 @@ namespace LiteMonitor
             // ⭐ 建议：如果上面的修改还是有轻微杂边，可以将下面这一行改为 AntiAlias
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-            TaskbarRenderer.Render(g, _cols);
+            TaskbarRenderer.Render(g, _cols, _lastIsLightTheme);
 
         }
         // 添加鼠标右键点击事件

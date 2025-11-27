@@ -5,14 +5,14 @@ using System.IO;
 namespace LiteMonitor.src.System
 {
     /// <summary>
-    /// ×ÔÆô¶¯¹ÜÀí£¨Í¨¹ıÏµÍ³×Ô´ø schtasks.exe ´´½¨¼Æ»®ÈÎÎñ£©
+    /// è‡ªå¯åŠ¨ç®¡ç†ï¼ˆé€šè¿‡ç³»ç»Ÿè‡ªå¸¦ schtasks.exe åˆ›å»ºè®¡åˆ’ä»»åŠ¡ï¼‰
     /// </summary>
     public static class AutoStart
     {
-        private const string TaskName = "LiteMonitor_AutoStart";  // ÈÎÎñÃûÎ¨Ò»¼´¿É
+        private const string TaskName = "LiteMonitor_AutoStart";  // ä»»åŠ¡åå”¯ä¸€å³å¯
 
         /// <summary>
-        /// ÆôÓÃ»ò½ûÓÃ¿ª»ú×ÔÆô
+        /// å¯ç”¨æˆ–ç¦ç”¨å¼€æœºè‡ªå¯
         /// </summary>
         public static void Set(bool enabled)
         {
@@ -23,7 +23,7 @@ namespace LiteMonitor.src.System
         }
 
         /// <summary>
-        /// ¼ì²éÈÎÎñÊÇ·ñ´æÔÚ
+        /// æ£€æŸ¥ä»»åŠ¡æ˜¯å¦å­˜åœ¨
         /// </summary>
         public static bool Exists()
         {
@@ -31,24 +31,24 @@ namespace LiteMonitor.src.System
         }
 
         /// <summary>
-        /// ´´½¨¼Æ»®ÈÎÎñ£ºµÇÂ¼´¥·¢£¬ÒÔ×î¸ßÈ¨ÏŞÔËĞĞ
+        /// åˆ›å»ºè®¡åˆ’ä»»åŠ¡ï¼šç™»å½•è§¦å‘ï¼Œä»¥æœ€é«˜æƒé™è¿è¡Œ
         /// </summary>
         private static void CreateTask()
         {
             string exePath = Process.GetCurrentProcess().MainModule!.FileName!;
-            // Ë«²ãÒıºÅ£º±ÜÃâ schtasks ³ÔµôÒıºÅ£¨Íâ²ã£©+ ±ÜÃâÂ·¾¶±»¿Õ¸ñ½Ø¶Ï£¨ÄÚ²ã£©
+            // åŒå±‚å¼•å·ï¼šé¿å… schtasks åƒæ‰å¼•å·ï¼ˆå¤–å±‚ï¼‰+ é¿å…è·¯å¾„è¢«ç©ºæ ¼æˆªæ–­ï¼ˆå†…å±‚ï¼‰
             string quotedPath = $"\"\\\"{exePath}\\\"\"";
 
-            // ÏÈÉ¾³ı¾ÉÈÎÎñ£¬±ÜÃâ±¨´í
+            // å…ˆåˆ é™¤æ—§ä»»åŠ¡ï¼Œé¿å…æŠ¥é”™
             RunSchtasks($"/Delete /TN \"{TaskName}\" /F", out _);
 
-            // µ±Ç°ÓÃ»§Ãû£¨ÀıÈç£ºTUEUR »ò DOMAIN\TUEUR£©
+            // å½“å‰ç”¨æˆ·åï¼ˆä¾‹å¦‚ï¼šTUEUR æˆ– DOMAIN\TUEURï¼‰
             string user = Environment.UserName;
 
-            // /RL HIGHEST ±íÊ¾×î¸ßÈ¨ÏŞ
-            // /IT ±íÊ¾½»»¥Ê½£¨±ØĞëµ±Ç°µÇÂ¼ÓÃ»§£©
-            // /SC ONLOGON ±íÊ¾ÓÃ»§µÇÂ¼Ê±´¥·¢
-            // ×¢Òâ£ºÔÚ Windows 10/11 ¼ÒÍ¥°æÎŞĞèÃÜÂëÊäÈë
+            // /RL HIGHEST è¡¨ç¤ºæœ€é«˜æƒé™
+            // /IT è¡¨ç¤ºäº¤äº’å¼ï¼ˆå¿…é¡»å½“å‰ç™»å½•ç”¨æˆ·ï¼‰
+            // /SC ONLOGON è¡¨ç¤ºç”¨æˆ·ç™»å½•æ—¶è§¦å‘
+            // æ³¨æ„ï¼šåœ¨ Windows 10/11 å®¶åº­ç‰ˆæ— éœ€å¯†ç è¾“å…¥
             string exeDir = Path.GetDirectoryName(exePath)!;
 
             string args =
@@ -58,17 +58,17 @@ namespace LiteMonitor.src.System
             int code = RunSchtasks(args, out string output);
             if (code != 0)
             {
-                // Ä³Ğ©ÏµÍ³ÉÏ /RU »áÒªÇóÃÜÂë£»ÕâÊ±È¥µô /RU ÔÙÊÔÒ»´Î
+                // æŸäº›ç³»ç»Ÿä¸Š /RU ä¼šè¦æ±‚å¯†ç ï¼›è¿™æ—¶å»æ‰ /RU å†è¯•ä¸€æ¬¡
                 args = $"/Create /TN \"{TaskName}\" /TR {quotedPath} /SC ONLOGON /RL HIGHEST /F /IT";
                 code = RunSchtasks(args, out output);
 
                 if (code != 0)
-                    throw new InvalidOperationException($"´´½¨¼Æ»®ÈÎÎñÊ§°Ü£¨ÍË³öÂë {code}£©£º\n{output}");
+                    throw new InvalidOperationException($"åˆ›å»ºè®¡åˆ’ä»»åŠ¡å¤±è´¥ï¼ˆé€€å‡ºç  {code}ï¼‰ï¼š\n{output}");
             }
         }
 
         /// <summary>
-        /// É¾³ıÈÎÎñ£¨ºöÂÔ²»´æÔÚµÄÇé¿ö£©
+        /// åˆ é™¤ä»»åŠ¡ï¼ˆå¿½ç•¥ä¸å­˜åœ¨çš„æƒ…å†µï¼‰
         /// </summary>
         private static void DeleteTask()
         {
@@ -76,7 +76,7 @@ namespace LiteMonitor.src.System
         }
 
         /// <summary>
-        /// Í¨ÓÃ schtasks Ö´ĞĞÆ÷
+        /// é€šç”¨ schtasks æ‰§è¡Œå™¨
         /// </summary>
         private static int RunSchtasks(string args, out string output)
         {

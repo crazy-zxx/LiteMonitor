@@ -14,6 +14,13 @@ namespace LiteMonitor
     public static class TaskbarRenderer
     {
         private static readonly Settings _settings = Settings.Load();
+        
+        // 字体缓存 - 直接初始化，避免每次渲染都创建字体
+        private static Font _cachedFont = new Font(
+                _settings.TaskbarFontFamily,
+                _settings.TaskbarFontSize,
+                _settings.TaskbarFontBold ? FontStyle.Bold : FontStyle.Regular
+            );
 
         // 浅色主题
         private static readonly Color LABEL_LIGHT = Color.FromArgb(20, 20, 20);
@@ -27,24 +34,14 @@ namespace LiteMonitor
         private static readonly Color WARN_DARK = Color.FromArgb(0xFF, 0xD6, 0x66);
         private static readonly Color CRIT_DARK = Color.FromArgb(0xFF, 0x66, 0x66);
 
-        private static bool IsSystemLight()
-        {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(
-                    @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-                return (int)(key?.GetValue("SystemUsesLightTheme", 1) ?? 1) != 0;
-            }
-            catch { return true; }
-        }
-
-        public static void Render(Graphics g, List<Column> cols)
+        public static void Render(Graphics g, List<Column> cols, bool light) // <--- 新的
         {
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
             g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
             g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
-            bool light = IsSystemLight();
+            // 使用传入的 light 参数，避免每次都查询系统主题瓠
+            //bool light = IsSystemLight();
 
             foreach (var col in cols)
             {
@@ -63,11 +60,8 @@ namespace LiteMonitor
                                UIUtils.FormatValue(item.Key, item.DisplayValue)
                            );
 
-            var font = new Font(
-                _settings.TaskbarFontFamily,
-                _settings.TaskbarFontSize,
-                _settings.TaskbarFontBold ? FontStyle.Bold : FontStyle.Regular
-            );
+            // 直接使用缓存的字体，不再 new Font
+            Font font = _cachedFont!;
 
             Color labelColor = light ? LABEL_LIGHT : LABEL_DARK;
             Color valueColor = PickColor(item.Key, item.DisplayValue, light);

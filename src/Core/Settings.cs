@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.IO;
 using System.Text.Json;
@@ -32,6 +32,7 @@ namespace LiteMonitor
 
         public bool ShowTaskbar { get; set; } = false; //开启任务栏显示
         public bool HideMainForm { get; set; } = false; //是否隐藏主窗口
+        public bool HideTrayIcon { get; set; } = false; //是否隐藏托盘图标
         public string ScreenDevice { get; set; } = ""; // 手动指定屏幕设备，""=自动
 
         // ====== 任务栏字体设置（从主题硬编码迁移出来） ======

@@ -56,7 +56,7 @@ namespace LiteMonitor.src.System
         {
             _map.Clear();
 
-            // ⭐ 按优先级排序：独显(GpuNvidia/GpuAmd) > 核显(GpuIntel) > 其他
+            // ⭐ 按优先级排序：独显(GpuNvidia > GpuAmd) > 核显(GpuIntel) > 其他
             var ordered = _computer.Hardware.OrderBy(h => GetHwPriority(h));
 
             foreach (var hw in ordered)
@@ -70,9 +70,9 @@ namespace LiteMonitor.src.System
             return hw.HardwareType switch
             {
                 HardwareType.GpuNvidia => 0, // 独显最高优先级
-                HardwareType.GpuAmd => 0,
-                HardwareType.GpuIntel => 1, // 核显靠后
-                _ => 2  // 其他最后
+                HardwareType.GpuAmd => 1,
+                HardwareType.GpuIntel => 2, // 核显靠后
+                _ => 3  // 其他最后
             };
         }
 
@@ -108,6 +108,8 @@ namespace LiteMonitor.src.System
                         return "CPU.Temp";
                     if (name.Contains("package") || name.Contains("tctl"))
                         return "CPU.Temp";
+                     if (name.Contains("cores"))
+                        return "CPU.Temp";
                 }
             }
 
@@ -119,14 +121,16 @@ namespace LiteMonitor.src.System
                     return "GPU.Load";
 
                 if (s.SensorType == SensorType.Temperature &&
-                    (name.Contains("core") || name.Contains("hot spot")))
+                    (name.Contains("core") || name.Contains("hot spot")
+                    || name.Contains("gpu vr soc") // 集成显卡核心温度
+                    ))
                     return "GPU.Temp";
 
                 if (s.SensorType == SensorType.SmallData)
                 {
-                    if ((name.Contains("dedicated") || name.Contains("memory")) && name.Contains("used"))
+                    if ((name.Contains("memory") || name.Contains("dedicated")) && name.Contains("used"))
                         return "GPU.VRAM.Used";
-                    if ((name.Contains("dedicated") || name.Contains("memory")) && name.Contains("total"))
+                    if ((name.Contains("memory") || name.Contains("dedicated")) && name.Contains("total"))
                         return "GPU.VRAM.Total";
                 }
 

@@ -19,6 +19,7 @@ namespace LiteMonitor
         private bool _dragging = false;
 
         private List<GroupLayoutInfo> _groups = new();
+        private List<Column> _hxCols = new();
         private List<Column> _hxColsHorizontal = new();
         private List<Column> _hxColsTaskbar = new();
         private HorizontalLayout? _hxLayout;

@@ -60,17 +60,37 @@ namespace LiteMonitor
                 AutoSize = true
             };
 
-            // === GitHub 链接 ===
-            var link = new LinkLabel
+            // === 官网链接 ===
+            var websiteLink = new LinkLabel
             {
-                Text = "GitHub: github.com/Diorser/LiteMonitor",
+                Text = "Website: LiteMonitor.cn",
                 LinkColor = Color.SkyBlue,
                 ActiveLinkColor = Color.LightSkyBlue,
                 VisitedLinkColor = Color.DeepSkyBlue,
                 Location = new Point(32, 150),
                 AutoSize = true
             };
-            link.LinkClicked += (_, __) =>
+            websiteLink.LinkClicked += (_, __) =>
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo("https://LiteMonitor.cn")
+                    { UseShellExecute = true });
+                }
+                catch { }
+            };
+
+            // === GitHub 链接 ===
+            var githubLink = new LinkLabel
+            {
+                Text = "GitHub: github.com/Diorser/LiteMonitor",
+                LinkColor = Color.SkyBlue,
+                ActiveLinkColor = Color.LightSkyBlue,
+                VisitedLinkColor = Color.DeepSkyBlue,
+                Location = new Point(32, 175),
+                AutoSize = true
+            };
+            githubLink.LinkClicked += (_, __) =>
             {
                 try
                 {
@@ -96,7 +116,7 @@ namespace LiteMonitor
             btnClose.FlatAppearance.BorderSize = 0;           // ✅ 移除白边框
             btnClose.FlatAppearance.MouseOverBackColor = ThemeManager.ParseColor(theme.Color.BarLow);
 
-            Controls.AddRange(new Control[] { lblTitle, lblVer, lblDesc, link, btnClose });
+            Controls.AddRange(new Control[] { lblTitle, lblVer, lblDesc, websiteLink, githubLink, btnClose });
         }
     }
 }

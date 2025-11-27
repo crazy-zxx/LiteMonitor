@@ -10,6 +10,31 @@ namespace LiteMonitor
     public static class MenuManager
     {
         /// <summary>
+        /// 检查三者（任务栏显示、隐藏界面、托盘图标）是否至少保留一个
+        /// 如果三者都关闭，则自动显示托盘图标
+        /// </summary>
+        public static bool EnsureAtLeastOneVisible(Settings cfg, MainForm form)
+        {
+            // 三者都关闭的情况
+            if (!cfg.ShowTaskbar && cfg.HideMainForm && cfg.HideTrayIcon)
+            {
+                // 自动显示托盘图标
+                cfg.HideTrayIcon = false;
+                cfg.Save();
+                
+                // 立即生效：显示托盘图标
+                if (form != null)
+                {
+                    form.ShowTrayIcon();
+                }
+                
+                return false; // 表示条件不满足，已自动修正
+            }
+            
+            return true; // 表示条件满足
+        }
+
+        /// <summary>
         /// 构建 LiteMonitor 主菜单（右键菜单 + 托盘菜单）
         /// </summary>
         public static ContextMenuStrip Build(MainForm form, Settings cfg, UIController? ui)
@@ -75,6 +100,9 @@ namespace LiteMonitor
                 cfg.ShowTaskbar = !cfg.ShowTaskbar;
                 cfg.Save();
 
+                // 检查三者必须保留一个
+                EnsureAtLeastOneVisible(cfg, form);
+
                 // 控制任务栏窗口显示/关闭
                 form.ToggleTaskbar(cfg.ShowTaskbar);
 
@@ -88,6 +116,44 @@ namespace LiteMonitor
             menu.Items.Add(modeRoot);
 
 
+             // === 隐藏托盘图标 ===
+            var hideTrayIcon = new ToolStripMenuItem(LanguageManager.T("Menu.HideTrayIcon"))
+            {
+                Checked = cfg.HideTrayIcon,
+                CheckOnClick = true
+            };
+
+            hideTrayIcon.CheckedChanged += (_, __) =>
+            {
+                // 检查是否满足隐藏托盘图标的条件：必须至少有一个其他显示方式开启
+                if (hideTrayIcon.Checked && !cfg.ShowTaskbar && cfg.HideMainForm)
+                {
+                    // 不满足条件，不允许隐藏托盘图标（任务栏关闭且界面隐藏时）
+                    hideTrayIcon.Checked = false;
+                    return;
+                }
+
+                cfg.HideTrayIcon = hideTrayIcon.Checked;
+                cfg.Save();
+
+                // 检查三者必须保留一个
+                EnsureAtLeastOneVisible(cfg, form);
+
+                // 立即生效：隐藏或显示托盘图标
+                if (cfg.HideTrayIcon)
+                {
+                    form.HideTrayIcon();
+                }
+                else
+                {
+                    form.ShowTrayIcon();
+                }
+            };
+
+            modeRoot.DropDownItems.Add(new ToolStripSeparator());
+            modeRoot.DropDownItems.Add(hideTrayIcon);
+            
+
             // === 隐藏主窗口（===
             var hideMainForm = new ToolStripMenuItem(LanguageManager.T("Menu.HideMainForm"))
             {
@@ -99,6 +165,9 @@ namespace LiteMonitor
             {
                 cfg.HideMainForm = hideMainForm.Checked;
                 cfg.Save();
+
+                // 检查三者必须保留一个
+                EnsureAtLeastOneVisible(cfg, form);
 
                 // 立即生效的行为（当前这次运行要不要立刻隐藏）
                 if (cfg.HideMainForm)
@@ -115,7 +184,6 @@ namespace LiteMonitor
 
             modeRoot.DropDownItems.Add(new ToolStripSeparator());
             modeRoot.DropDownItems.Add(hideMainForm);
-
             
             menu.Items.Add(new ToolStripSeparator());
 
@@ -215,15 +283,33 @@ namespace LiteMonitor
 
             // === 更多 ===
             var moreRoot = new ToolStripMenuItem(LanguageManager.T("Menu.More"));
+            moreRoot.Image = Properties.Resources.MoreIcon;// 添加更多图标
             menu.Items.Add(moreRoot);
 
             // 主题编辑器
             var themeEditor = new ToolStripMenuItem(LanguageManager.T("Menu.ThemeEditor"));
+             themeEditor.Image = Properties.Resources.ThemeIcon;// 添加主题编辑器图标
             themeEditor.Click += (_, __) => new ThemeEditor.ThemeEditorForm().Show();
             moreRoot.DropDownItems.Add(themeEditor);
             moreRoot.DropDownItems.Add(new ToolStripSeparator());
 
-           
+
+            // 网络测速
+            var speedWindow = new ToolStripMenuItem(LanguageManager.T("Menu.Speedtest"));
+            speedWindow.Image = Properties.Resources.NetworkIcon;// 添加网络测速图标
+            speedWindow.Click += (_, __) =>
+            {
+                var f = new SpeedTestForm();
+                f.StartPosition = FormStartPosition.Manual;
+                f.Location = new Point(form.Left + 20, form.Top + 20);
+                f.Show();
+            };
+            moreRoot.DropDownItems.Add(speedWindow);
+            moreRoot.DropDownItems.Add(new ToolStripSeparator());
+            
+
+
+
 
             // 自动隐藏
             var autoHide = new ToolStripMenuItem(LanguageManager.T("Menu.AutoHide"))
