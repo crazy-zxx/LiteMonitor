@@ -20,8 +20,6 @@ namespace LiteMonitor
         private Rectangle _taskbarRect = Rectangle.Empty;
         private int _taskbarHeight = 32;
         private bool _isWin11;
-        // 1. 在类中增加变量，用于控制检测频率
-        private int _checkLayoutCounter = 0;
 
         // ⭐ 动态透明色键：不再是 readonly，因为要随主题变
         private Color _transparentKey = Color.Black;
@@ -215,23 +213,14 @@ namespace LiteMonitor
 
             _cols = _ui.GetTaskbarColumns();
             if (_cols == null || _cols.Count == 0) return;
-            // ★★★ 优化开始：每 5 次 Tick (约5秒) 才检查一次任务栏位置 ★★★
-            _checkLayoutCounter++;
-            if (_checkLayoutCounter >= 5 || _taskbarRect.IsEmpty)
-            {
-                _checkLayoutCounter = 0;
+            UpdateTaskbarRect(); 
                 
-                // 这些昂贵的操作不再每帧都跑
-                UpdateTaskbarRect(); 
-                
-                // 重新构建布局 (Build 内部也有 MeasureText，能省则省)
-                _layout.Build(_cols, _taskbarHeight);
-                Width = _layout.PanelWidth;
-                Height = _taskbarHeight;
-                
-                UpdatePlacement(Width);
-            }
-            // ★★★ 优化结束 ★★★
+            // 重新构建布局 (Build 内部也有 MeasureText，能省则省)
+            _layout.Build(_cols, _taskbarHeight);
+            Width = _layout.PanelWidth;
+            Height = _taskbarHeight;
+            
+            UpdatePlacement(Width);
 
             // 最终渲染
             Invalidate();
