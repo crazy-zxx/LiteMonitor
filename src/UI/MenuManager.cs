@@ -5,6 +5,8 @@ using System.Windows.Forms;
 using System.Drawing;
 using LiteMonitor.src.System;
 using LiteMonitor.src.Core;
+using System.Collections.Generic;
+
 namespace LiteMonitor
 {
     public static class MenuManager
@@ -21,16 +23,16 @@ namespace LiteMonitor
                 // 自动显示托盘图标
                 cfg.HideTrayIcon = false;
                 cfg.Save();
-                
+
                 // 立即生效：显示托盘图标
                 if (form != null)
                 {
                     form.ShowTrayIcon();
                 }
-                
+
                 return false; // 表示条件不满足，已自动修正
             }
-            
+
             return true; // 表示条件满足
         }
 
@@ -40,6 +42,42 @@ namespace LiteMonitor
         public static ContextMenuStrip Build(MainForm form, Settings cfg, UIController? ui)
         {
             var menu = new ContextMenuStrip();
+
+            // ==================================================================================
+            // 1. 基础功能区 (置顶、显示模式、任务栏开关、隐藏主界面/托盘)
+            // ==================================================================================
+
+            // =================================================================
+            // [新增] 设置中心入口
+            // 建议放在菜单的最顶端，方便调试
+            // =================================================================
+            var itemSettings = new ToolStripMenuItem("设置中心"); 
+            // 临时写死中文，等面板做完善了再换成 LanguageManager.T("Menu.Settings")
+            
+            // 稍微加重一点字体，突出显示
+            itemSettings.Font = new Font(itemSettings.Font, FontStyle.Bold); 
+
+            itemSettings.Click += (_, __) =>
+            {
+                try
+                {
+                    // 打开设置窗口 (模态对话框，阻塞主窗口直到关闭)
+                    // 注意：需要引用 LiteMonitor.src.UI 命名空间，或写全名
+                    using (var f = new LiteMonitor.src.UI.SettingsForm(cfg, ui, form))
+                    {
+                        f.ShowDialog(form);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("设置面板启动失败: " + ex.Message);
+                }
+            };
+            menu.Items.Add(itemSettings);
+            
+            // 加一条分隔线，与下面的旧菜单隔开
+            menu.Items.Add(new ToolStripSeparator());
+            // =================================================================
 
             // === 置顶 ===
             var topMost = new ToolStripMenuItem(LanguageManager.T("Menu.TopMost"))
@@ -117,7 +155,7 @@ namespace LiteMonitor
             menu.Items.Add(modeRoot);
 
 
-             // === 隐藏托盘图标 ===
+            // === 隐藏托盘图标 ===
             var hideTrayIcon = new ToolStripMenuItem(LanguageManager.T("Menu.HideTrayIcon"))
             {
                 Checked = cfg.HideTrayIcon,
@@ -153,9 +191,9 @@ namespace LiteMonitor
 
             modeRoot.DropDownItems.Add(new ToolStripSeparator());
             modeRoot.DropDownItems.Add(hideTrayIcon);
-            
 
-            // === 隐藏主窗口（===
+
+            // === 隐藏主窗口 ===
             var hideMainForm = new ToolStripMenuItem(LanguageManager.T("Menu.HideMainForm"))
             {
                 Checked = cfg.HideMainForm,
@@ -174,7 +212,7 @@ namespace LiteMonitor
                 if (cfg.HideMainForm)
                 {
                     // 只隐藏主窗口，不影响任务栏
-                    form.Hide();; // 下面会加这个方法
+                    form.Hide();
                 }
                 else
                 {
@@ -185,103 +223,103 @@ namespace LiteMonitor
 
             modeRoot.DropDownItems.Add(new ToolStripSeparator());
             modeRoot.DropDownItems.Add(hideMainForm);
-            
+
             menu.Items.Add(new ToolStripSeparator());
 
 
-              // === 显示监控项 ===
+            // ==================================================================================
+            // 2. ★★★ [核心修复] 显示监控项 (动态生成) ★★★
+            // ==================================================================================
+
             var grpShow = new ToolStripMenuItem(LanguageManager.T("Menu.ShowItems"));
             menu.Items.Add(grpShow);
 
-            void AddToggle(string key, Func<bool> get, Action<bool> set)
-            {
-                var item = new ToolStripMenuItem(LanguageManager.T(key))
-                {
-                    Checked = get(),
-                    CheckOnClick = true
-                };
-                item.CheckedChanged += (_, __) =>
-                {
-                    set(item.Checked);
-                    cfg.Save();
-                    ui?.ApplyTheme(cfg.Skin);
-                };
-                grpShow.DropDownItems.Add(item);
-            }
-
-            // === 1. [修改] 引导提示函数 (基于 Setting 记录) ===
+            // --- 内部辅助函数：最大值引导提示 (保留原逻辑) ---
             void CheckAndRemind(string name)
             {
                 // 如果已经提示过，直接跳过 (永久防打扰)
                 if (cfg.MaxLimitTipShown) return;
 
                 string msg = cfg.Language == "zh"
-                    // ★★★ 中文：您提供的文案 ★★★
                     ? $"您是首次开启 {name}。\n\n建议设置一下电脑实际“最大{name}”，让进度条显示更准确。\n\n是否现在去设置？\n\n点“否”将不再提示，程序将在高负载时（如大型游戏时）进行动态学习最大值"
-                    // ★★★ 英文：对应翻译 ★★★
                     : $"You are enabling {name} for the first time.\n\nIt is recommended to set the actual 'Max {name}' for accurate progress bars.\n\nGo to settings now?\n\n(Select 'No' to suppress this prompt. The app will auto-learn the max value under high load.)";
 
-                // ★★★ 核心：无论用户选什么，都标记为“已阅”，以后不再弹窗 ★★★
                 cfg.MaxLimitTipShown = true;
                 cfg.Save();
 
-                // 弹窗询问
                 if (MessageBox.Show(msg, "LiteMonitor Setup", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {
-                    // 用户选“是” -> 打开设置窗口
                     var f = new ThresholdForm(cfg);
                     if (f.ShowDialog() == DialogResult.OK)
                     {
-                        ui?.RebuildLayout(); 
-                        form.RebuildMenus(); 
+                        ui?.RebuildLayout();
+                        form.RebuildMenus();
                     }
                 }
             }
 
-            AddToggle("Items.CPU.Load", () => cfg.Enabled.CpuLoad, v => cfg.Enabled.CpuLoad = v);
-            AddToggle("Items.CPU.Temp", () => cfg.Enabled.CpuTemp, v => cfg.Enabled.CpuTemp = v);
-            // CPU
-            AddToggle("Items.CPU.Clock", () => cfg.Enabled.CpuClock, v => {
-                cfg.Enabled.CpuClock = v;
-                // ★★★ 修改：使用多语言键值替代硬编码 ★★★
-                if (v) CheckAndRemind(LanguageManager.T("Items.CPU.Clock"));
-            });
-            AddToggle("Items.CPU.Power", () => cfg.Enabled.CpuPower, v => {
-                cfg.Enabled.CpuPower = v;
-                if (v) CheckAndRemind(LanguageManager.T("Items.CPU.Power"));
-            });
-            grpShow.DropDownItems.Add(new ToolStripSeparator());
-            AddToggle("Items.GPU.Load", () => cfg.Enabled.GpuLoad, v => cfg.Enabled.GpuLoad = v);
-            AddToggle("Items.GPU.Temp", () => cfg.Enabled.GpuTemp, v => cfg.Enabled.GpuTemp = v);
-            AddToggle("Items.GPU.VRAM", () => cfg.Enabled.GpuVram, v => cfg.Enabled.GpuVram = v);
-            AddToggle("Items.GPU.Clock", () => cfg.Enabled.GpuClock, v => {
-                cfg.Enabled.GpuClock = v;
-                if (v) CheckAndRemind(LanguageManager.T("Items.GPU.Clock"));
-            });
-            AddToggle("Items.GPU.Power", () => cfg.Enabled.GpuPower, v => {
-                cfg.Enabled.GpuPower = v;
-                if (v) CheckAndRemind(LanguageManager.T("Items.GPU.Power"));
-            });
-            grpShow.DropDownItems.Add(new ToolStripSeparator());
-            AddToggle("Items.MEM.Load", () => cfg.Enabled.MemLoad, v => cfg.Enabled.MemLoad = v);
-            grpShow.DropDownItems.Add(new ToolStripSeparator());
-            AddToggle("Groups.DISK",
-                () => cfg.Enabled.DiskRead || cfg.Enabled.DiskWrite,
-                v => { cfg.Enabled.DiskRead = v; cfg.Enabled.DiskWrite = v; });
+            // --- 动态遍历 MonitorItems 列表 ---
+            // 1. 先按 SortIndex 排序
+            var sortedItems = cfg.MonitorItems.OrderBy(x => x.SortIndex).ToList();
 
-            AddToggle("Groups.NET",
-                () => cfg.Enabled.NetUp || cfg.Enabled.NetDown,
-                v => { cfg.Enabled.NetUp = v; cfg.Enabled.NetDown = v; });
-            AddToggle("Groups.DATA",
-                () => cfg.Enabled.TrafficDay,
-                v => cfg.Enabled.TrafficDay = v);
+            // 2. 按 Key 的前缀分组 (CPU, GPU, MEM, NET, DISK, DATA...)
+            var itemGroups = sortedItems.GroupBy(x => x.Key.Split('.')[0]);
+
+            foreach (var group in itemGroups)
+            {
+                // 创建分组菜单 (例如 "CPU", "GPU")
+                // 这里可以简单把前缀显示出来，或者针对 CPU/GPU 做个特殊翻译，目前直接用前缀
+                var groupMenu = new ToolStripMenuItem(group.Key);
+
+                foreach (var itemConfig in group)
+                {
+                    // 获取显示名称：优先用 UserLabel，没有则用多语言 Key
+                    string label = !string.IsNullOrEmpty(itemConfig.UserLabel)
+                        ? itemConfig.UserLabel
+                        : LanguageManager.T("Items." + itemConfig.Key);
+
+                    // 防呆
+                    if (string.IsNullOrEmpty(label)) label = itemConfig.Key;
+
+                    var menuItem = new ToolStripMenuItem(label)
+                    {
+                        Checked = itemConfig.VisibleInPanel, // 绑定到 VisibleInPanel
+                        CheckOnClick = true
+                    };
+
+                    menuItem.CheckedChanged += (_, __) =>
+                    {
+                        // 1. 修改配置
+                        itemConfig.VisibleInPanel = menuItem.Checked;
+                        cfg.Save();
+
+                        // 2. 刷新界面
+                        // RebuildLayout 会重新读取列表并生成 UI
+                        ui?.RebuildLayout();
+
+                        // 3. 检查是否需要弹窗提示 (Clock/Power)
+                        if (menuItem.Checked)
+                        {
+                            if (itemConfig.Key.Contains("Clock") || itemConfig.Key.Contains("Power"))
+                            {
+                                CheckAndRemind(label);
+                            }
+                        }
+                    };
+
+                    groupMenu.DropDownItems.Add(menuItem);
+                }
+
+                // 将分组加到“显示项目”下
+                grpShow.DropDownItems.Add(groupMenu);
+            }
+
+            menu.Items.Add(new ToolStripSeparator()); // 分隔符
 
 
-            
-
-
-          
-
+            // ==================================================================================
+            // 3. 主题、工具与更多功能 (完整保留)
+            // ==================================================================================
 
             // === 主题 ===
             var themeRoot = new ToolStripMenuItem(LanguageManager.T("Menu.Theme"));
@@ -324,44 +362,36 @@ namespace LiteMonitor
 
 
             // 历史流量统计
-            var trafficItem = new ToolStripMenuItem(LanguageManager.T("Menu.Traffic")); // 建议: LanguageManager.T("Menu.Traffic")
-            trafficItem.Image = Properties.Resources.TrafficIcon;// 添加流量统计图标
+            var trafficItem = new ToolStripMenuItem(LanguageManager.T("Menu.Traffic"));
+            trafficItem.Image = Properties.Resources.TrafficIcon;
             trafficItem.Click += (_, __) =>
             {
-                // 创建并显示窗口
-                var form = new TrafficHistoryForm(cfg);
-                form.Show();
+                var formHistory = new TrafficHistoryForm(cfg);
+                formHistory.Show();
             };
             menu.Items.Add(trafficItem);
 
             // === 更多功能 ===
             var moreRoot = new ToolStripMenuItem(LanguageManager.T("Menu.More"));
-            moreRoot.Image = Properties.Resources.MoreIcon;// 添加更多图标
+            moreRoot.Image = Properties.Resources.MoreIcon;
             menu.Items.Add(moreRoot);
 
             // 主题编辑器
             var themeEditor = new ToolStripMenuItem(LanguageManager.T("Menu.ThemeEditor"));
-             themeEditor.Image = Properties.Resources.ThemeIcon;// 添加主题编辑器图标
+            themeEditor.Image = Properties.Resources.ThemeIcon;
             themeEditor.Click += (_, __) => new ThemeEditor.ThemeEditorForm().Show();
             moreRoot.DropDownItems.Add(themeEditor);
             moreRoot.DropDownItems.Add(new ToolStripSeparator());
 
             // 阈值设置
-            var thresholdItem = new ToolStripMenuItem(LanguageManager.T("Menu.Thresholds")); 
-            // 添加阈值设置图标
-            thresholdItem.Image = Properties.Resources.Threshold;// 添加阈值设置图标
+            var thresholdItem = new ToolStripMenuItem(LanguageManager.T("Menu.Thresholds"));
+            thresholdItem.Image = Properties.Resources.Threshold;
             thresholdItem.Click += (_, __) =>
             {
                 var f = new ThresholdForm(cfg);
-                
-                // ★★★ 核心修复：监听窗口关闭结果 ★★★
                 if (f.ShowDialog() == DialogResult.OK)
                 {
-                    // 如果用户点了保存，强制主窗口重建菜单
-                    // 这样菜单上的 "高温报警 (>XX°C)" 才会变成新的数值
                     form.RebuildMenus();
-                    
-                    // 顺便刷新一下界面布局（虽然阈值不影响布局，但为了稳妥）
                     ui?.RebuildLayout();
                 }
             };
@@ -372,34 +402,33 @@ namespace LiteMonitor
             string strTaskbar = LanguageManager.T("Menu.TaskbarSettings");
             var taskbarMenu = new ToolStripMenuItem(strTaskbar);
 
-            // 1. 简洁显示 (逻辑不变：修改字号)
+            // 1. 简洁显示
             bool isCompact = (Math.Abs(cfg.TaskbarFontSize - 9f) < 0.1f) && !cfg.TaskbarFontBold;
             string strCompact = LanguageManager.T("Menu.TaskbarCompact");
             var itemCompact = new ToolStripMenuItem(strCompact)
             {
                 Checked = isCompact,
-                CheckOnClick = true 
+                CheckOnClick = true
             };
             itemCompact.Click += (s, e) => {
-                if (itemCompact.Checked) {
+                if (itemCompact.Checked)
+                {
                     cfg.TaskbarFontSize = 9f;
                     cfg.TaskbarFontBold = false;
-                } else {
+                }
+                else
+                {
                     cfg.TaskbarFontSize = 10f;
                     cfg.TaskbarFontBold = true;
                 }
                 cfg.Save();
-                // 4. ★★★ 核心修复：遍历所有窗口找到 TaskbarForm 并刷新布局 ★★★
-                // 这样就不用管 form 是 Main 还是什么了，直接找目标
+
+                // 刷新所有 TaskbarForm
                 foreach (Form f in Application.OpenForms)
                 {
-                    if (f is TaskbarForm tf)
-                    {
-                        tf.ReloadLayout(); // 调用刚才加的方法
-                    }
+                    if (f is TaskbarForm tf) tf.ReloadLayout();
                 }
                 ui?.ApplyTheme(cfg.Skin);
-                
             };
             taskbarMenu.DropDownItems.Add(itemCompact);
 
@@ -407,16 +436,13 @@ namespace LiteMonitor
             if (TaskbarForm.IsCenterAligned())
             {
                 taskbarMenu.DropDownItems.Add(new ToolStripSeparator());
-                
-                // ... (创建 居左/居右 菜单项的代码，保持不变) ...
-                // 核心：用户只需点“居左”，程序会自动算 GetWidgetsWidth 来避让
-                
+
                 string strAlign = LanguageManager.T("Menu.TaskbarAlign");
                 var itemAlign = new ToolStripMenuItem(strAlign);
                 string strRight = LanguageManager.T("Menu.TaskbarAlignRight");
-                string strLeft  = LanguageManager.T("Menu.TaskbarAlignLeft");
+                string strLeft = LanguageManager.T("Menu.TaskbarAlignLeft");
                 var menuRight = new ToolStripMenuItem(strRight) { Checked = !cfg.TaskbarAlignLeft, CheckOnClick = true };
-                var menuLeft  = new ToolStripMenuItem(strLeft)  { Checked = cfg.TaskbarAlignLeft, CheckOnClick = true };
+                var menuLeft = new ToolStripMenuItem(strLeft) { Checked = cfg.TaskbarAlignLeft, CheckOnClick = true };
 
                 menuRight.Click += (s, e) => {
                     cfg.TaskbarAlignLeft = false; cfg.Save();
@@ -436,12 +462,11 @@ namespace LiteMonitor
             {
                 if (cfg.TaskbarAlignLeft) { cfg.TaskbarAlignLeft = false; cfg.Save(); }
             }
-            
+
             moreRoot.DropDownItems.Add(taskbarMenu);
             moreRoot.DropDownItems.Add(new ToolStripSeparator());
 
-            
-            
+
             // === 高温报警 ===
             var alertItem = new ToolStripMenuItem(LanguageManager.T("Menu.AlertTemp") + " (>" + cfg.AlertTempThreshold + "°C)")
             {
@@ -473,7 +498,7 @@ namespace LiteMonitor
             };
             moreRoot.DropDownItems.Add(autoHide);
 
-            // ★ 新增：限制窗口拖出屏幕
+            // 限制窗口拖出屏幕
             var clampItem = new ToolStripMenuItem(LanguageManager.T("Menu.ClampToScreen"))
             {
                 Checked = cfg.ClampToScreen,
@@ -486,7 +511,7 @@ namespace LiteMonitor
             };
             moreRoot.DropDownItems.Add(clampItem);
 
-             // 鼠标穿透
+            // 鼠标穿透
             var clickThrough = new ToolStripMenuItem(LanguageManager.T("Menu.ClickThrough"))
             {
                 Checked = cfg.ClickThrough,
@@ -504,7 +529,7 @@ namespace LiteMonitor
 
             // === 刷新频率 ===
             var refreshRoot = new ToolStripMenuItem(LanguageManager.T("Menu.Refresh"));
-            int[] presetRefresh = { 100, 200, 300, 500,600,700, 800, 1000, 1500, 2000,3000 };
+            int[] presetRefresh = { 100, 200, 300, 500, 600, 700, 800, 1000, 1500, 2000, 3000 };
 
             foreach (var ms in presetRefresh)
             {
@@ -518,8 +543,8 @@ namespace LiteMonitor
                     cfg.RefreshMs = ms;
                     cfg.Save();
 
-                    // 立即应用新刷新时间（UIController 会自动在下次 Tick 使用）
-                    ui?.ApplyTheme(cfg.Skin); // 触发 UI 重建 & Timer 重载
+                    // 立即应用新刷新时间
+                    ui?.ApplyTheme(cfg.Skin);
 
                     foreach (ToolStripMenuItem other in refreshRoot.DropDownItems)
                         other.Checked = false;
@@ -589,18 +614,9 @@ namespace LiteMonitor
             var scaleRoot = new ToolStripMenuItem(LanguageManager.T("Menu.Scale"));
             (double val, string key)[] presetScales =
             {
-                (2.00, "200%"),
-                (1.75, "175%"),
-                (1.50, "150%"),
-                (1.25, "125%"),
-                (1.00, "100%"),
-                (0.90, "90%"),
-                (0.85, "85%"),
-                (0.80, "80%"),
-                (0.75, "75%"),
-                (0.70, "70%"),
-                (0.60, "60%"),
-                (0.50, "50%")
+                (2.00, "200%"), (1.75, "175%"), (1.50, "150%"), (1.25, "125%"),
+                (1.00, "100%"), (0.90, "90%"),  (0.85, "85%"),  (0.80, "80%"),
+                (0.75, "75%"),  (0.70, "70%"),  (0.60, "60%"),  (0.50, "50%")
             };
 
             double currentScale = cfg.UIScale;
@@ -615,7 +631,6 @@ namespace LiteMonitor
                 {
                     cfg.UIScale = scale;
                     cfg.Save();
-
                     ui?.ApplyTheme(cfg.Skin);
 
                     foreach (ToolStripMenuItem other in scaleRoot.DropDownItems)
@@ -628,39 +643,28 @@ namespace LiteMonitor
             }
 
             moreRoot.DropDownItems.Add(scaleRoot);
-            
+
             moreRoot.DropDownItems.Add(new ToolStripSeparator());
-
-
-
-
 
             // === 磁盘来源 ===
             var diskRoot = new ToolStripMenuItem(LanguageManager.T("Menu.DiskSource"));
-
-            // 自动项
             var autoDisk = new ToolStripMenuItem(LanguageManager.T("Menu.Auto"))
             {
                 Checked = string.IsNullOrWhiteSpace(cfg.PreferredDisk)
             };
-
             autoDisk.Click += (_, __) =>
             {
                 cfg.PreferredDisk = "";
                 cfg.Save();
                 ui?.RebuildLayout();
             };
-
             diskRoot.DropDownItems.Add(autoDisk);
 
-            // === 惰性加载 ===
+            // 惰性加载
             diskRoot.DropDownOpening += (_, __) =>
             {
-                // 每次打开都同步自动项的勾选状态
                 autoDisk.Checked = string.IsNullOrWhiteSpace(cfg.PreferredDisk);
-
-                while (diskRoot.DropDownItems.Count > 1)
-                    diskRoot.DropDownItems.RemoveAt(1);
+                while (diskRoot.DropDownItems.Count > 1) diskRoot.DropDownItems.RemoveAt(1);
 
                 foreach (var name in HardwareMonitor.ListAllDisks())
                 {
@@ -668,50 +672,36 @@ namespace LiteMonitor
                     {
                         Checked = name == cfg.PreferredDisk
                     };
-
                     item.Click += (_, __) =>
                     {
                         cfg.PreferredDisk = name;
                         cfg.Save();
                         ui?.RebuildLayout();
                     };
-
                     diskRoot.DropDownItems.Add(item);
                 }
             };
-
             moreRoot.DropDownItems.Add(diskRoot);
-
-
-
 
             // === 网络来源 ===
             var netRoot = new ToolStripMenuItem(LanguageManager.T("Menu.NetworkSource"));
-
-            // 自动项
             var autoNet = new ToolStripMenuItem(LanguageManager.T("Menu.Auto"))
             {
                 Checked = string.IsNullOrWhiteSpace(cfg.PreferredNetwork)
             };
-
             autoNet.Click += (_, __) =>
             {
                 cfg.PreferredNetwork = "";
                 cfg.Save();
                 ui?.RebuildLayout();
             };
-
             netRoot.DropDownItems.Add(autoNet);
 
-            // === 惰性加载 ===
+            // 惰性加载
             netRoot.DropDownOpening += (_, __) =>
             {
-                // 每次打开都同步自动项的勾选状态
                 autoNet.Checked = string.IsNullOrWhiteSpace(cfg.PreferredNetwork);
-
-                // 清理之前的（自动项保留）
-                while (netRoot.DropDownItems.Count > 1)
-                    netRoot.DropDownItems.RemoveAt(1);
+                while (netRoot.DropDownItems.Count > 1) netRoot.DropDownItems.RemoveAt(1);
 
                 foreach (var name in HardwareMonitor.ListAllNetworks())
                 {
@@ -719,25 +709,18 @@ namespace LiteMonitor
                     {
                         Checked = name == cfg.PreferredNetwork
                     };
-
                     item.Click += (_, __) =>
                     {
                         cfg.PreferredNetwork = name;
                         cfg.Save();
                         ui?.RebuildLayout();
                     };
-
                     netRoot.DropDownItems.Add(item);
                 }
             };
-
             moreRoot.DropDownItems.Add(netRoot);
 
             menu.Items.Add(new ToolStripSeparator());
-
-            
-
-
 
             // === 语言切换 ===
             var langRoot = new ToolStripMenuItem(LanguageManager.T("Menu.Language"));
@@ -758,10 +741,7 @@ namespace LiteMonitor
                     {
                         cfg.Language = code;
                         cfg.Save();
-
                         ui?.ApplyTheme(cfg.Skin);
-
-                        // 让 MainForm 来重建菜单（最优雅）
                         form.RebuildMenus();
                     };
 
@@ -771,7 +751,6 @@ namespace LiteMonitor
 
             menu.Items.Add(langRoot);
             menu.Items.Add(new ToolStripSeparator());
-
 
             // === 开机启动 ===
             var autoStart = new ToolStripMenuItem(LanguageManager.T("Menu.AutoStart"))
@@ -786,8 +765,6 @@ namespace LiteMonitor
                 AutoStart.Set(cfg.AutoStart);
             };
             menu.Items.Add(autoStart);
-
-
 
             // === 关于 ===
             var about = new ToolStripMenuItem(LanguageManager.T("Menu.About"));

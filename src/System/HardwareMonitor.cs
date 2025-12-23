@@ -112,70 +112,60 @@ namespace LiteMonitor.src.System
         {
             try
             {
-                // [新增] 计算时间差 (用于流量积分：流量 = 速率 * 时间)
                 DateTime now = DateTime.Now;
                 double timeDelta = (now - _lastTrafficTime).TotalSeconds;
                 _lastTrafficTime = now;
-                // 防止休眠唤醒后的巨大数值
                 if (timeDelta > 5.0) timeDelta = 0;
 
-                // 1. 预判开关
-                bool needCpu = _cfg.Enabled.CpuLoad || _cfg.Enabled.CpuTemp || _cfg.Enabled.CpuClock || _cfg.Enabled.CpuPower;
-                bool needGpu = _cfg.Enabled.GpuLoad || _cfg.Enabled.GpuTemp || _cfg.Enabled.GpuVram || _cfg.Enabled.GpuClock || _cfg.Enabled.GpuPower;
-                bool needMem = _cfg.Enabled.MemLoad;
-                bool needNet = _cfg.Enabled.NetUp || _cfg.Enabled.NetDown;
-                bool needDisk = _cfg.Enabled.DiskRead || _cfg.Enabled.DiskWrite;
+                // ★★★ 核心改动：使用 List 判断是否需要更新 ★★★
+                // 只要列表中有任意一个 CPU 相关的项开启 (无论是面板还是任务栏)，就需要更新 CPU
+                bool needCpu = _cfg.IsAnyEnabled("CPU");
+                bool needGpu = _cfg.IsAnyEnabled("GPU");
+                bool needMem = _cfg.IsAnyEnabled("MEM");
+                bool needNet = _cfg.IsAnyEnabled("NET") || _cfg.IsAnyEnabled("DATA");
+                bool needDisk = _cfg.IsAnyEnabled("DISK");
 
-                // 2. 启动保护期 (前3秒)
                 bool isStartupPhase = (DateTime.Now - _startTime).TotalSeconds < 3;
-                
-                // 3. 慢速扫描信号 (每3秒一次)
                 bool isSlowScanTick = (DateTime.Now - _lastSlowScan).TotalSeconds > 3;
 
                 foreach (var hw in _computer.Hardware)
                 {
-                    // --- CPU / GPU / Memory (核心硬件：每秒实时更新) ---
+                    // CPU / GPU / Memory
                     if (hw.HardwareType == HardwareType.Cpu) { if (needCpu) hw.Update(); continue; }
                     if (hw.HardwareType == HardwareType.GpuNvidia || hw.HardwareType == HardwareType.GpuAmd || hw.HardwareType == HardwareType.GpuIntel) { if (needGpu) hw.Update(); continue; }
                     if (hw.HardwareType == HardwareType.Memory) { if (needMem) hw.Update(); continue; }
 
-                    // --- 网络 (Network) ---
+                    // Network
                     if (hw.HardwareType == HardwareType.Network)
                     {
                         if (needNet) 
                         {
-                            // 判断是否为“特权网卡” (满足以下任一条件即为特权)：
-                            // 1. 它是当前缓存正在读的 (Cached)
-                            // 2. 它是上次自动记忆的 (LastAuto)
-                            // 3. 它是用户手动指定的 (Preferred) -> 即使是虚拟网卡也能由用户强制开启
                             bool isTarget = (_cachedNetHw != null && hw == _cachedNetHw) || 
                                             (hw.Name == _cfg.LastAutoNetwork) ||
                                             (hw.Name == _cfg.PreferredNetwork);
 
-                            // 逻辑分流：
                             if (isTarget)
                             {
-                                hw.Update(); // 特权：无视保护期，无视虚拟身份，每秒全速更新 (秒出数据)
-                                AccumulateTraffic(hw, timeDelta);//// ★★★ 核心：累加流量 ★★★
+                                hw.Update(); 
+                                AccumulateTraffic(hw, timeDelta);
                             }
                             else if (isStartupPhase || IsVirtualNetwork(hw.Name))
                             {
-                                continue;    // 垃圾/闲置：启动期跳过，虚拟网卡跳过 (优化启动速度)
+                                continue;    
                             }
                             else if (isSlowScanTick)
                             {
-                                hw.Update(); // 普通物理网卡：慢速巡检 (3秒一次)
+                                hw.Update(); 
                             }
                         }
                         continue;
                     }
 
-                    // --- 磁盘 (Storage) ---
+                    // Storage
                     if (hw.HardwareType == HardwareType.Storage)
                     {
                         if (needDisk) 
                         {
-                            // 磁盘同理：如果是上次记住的盘，直接更新，不等3秒
                             bool isTarget = (_cachedDiskHw != null && hw == _cachedDiskHw) || 
                                             (hw.Name == _cfg.LastAutoDisk) || 
                                             (hw.Name == _cfg.PreferredDisk);
@@ -184,11 +174,11 @@ namespace LiteMonitor.src.System
                             {
                                 hw.Update(); 
                             }
-                            else if (isStartupPhase) // 其他盘受启动保护
+                            else if (isStartupPhase) 
                             {
                                 continue;
                             }
-                            else if (isSlowScanTick) // 慢速扫描
+                            else if (isSlowScanTick) 
                             {
                                 hw.Update();
                             }
@@ -197,10 +187,9 @@ namespace LiteMonitor.src.System
                     }
                 }
                 
-                // 如果执行了慢速扫描，重置计时器
                 if (isSlowScanTick) _lastSlowScan = DateTime.Now;
 
-                // ★★★ 核心：每 60 秒自动保存一次流量数据 ★★★
+                // 流量自动保存
                 if ((DateTime.Now - _lastTrafficSave).TotalSeconds > 60)
                 {
                     TrafficLogger.Save();
