@@ -56,8 +56,6 @@ namespace LiteMonitor
 
         // ====== 任务栏：高级自定义外观 ======
         public bool TaskbarCustomStyle { get; set; } = false; // 总开关
-
-        // 颜色配置 (Hex格式)
         public string TaskbarColorLabel { get; set; } = "#141414"; // 标签颜色
         public string TaskbarColorSafe { get; set; } = "#008040";  // 正常 (淡绿)
         public string TaskbarColorWarn { get; set; } = "#B57500";  // 警告 (金黄)

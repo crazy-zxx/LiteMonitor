@@ -103,16 +103,6 @@ namespace LiteMonitor.Properties {
         /// <summary>
         ///   查找 System.Drawing.Bitmap 类型的本地化资源。
         /// </summary>
-        internal static System.Drawing.Bitmap Threshold {
-            get {
-                object obj = ResourceManager.GetObject("Threshold", resourceCulture);
-                return ((System.Drawing.Bitmap)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
-        /// </summary>
         internal static System.Drawing.Bitmap TrafficIcon {
             get {
                 object obj = ResourceManager.GetObject("TrafficIcon", resourceCulture);
