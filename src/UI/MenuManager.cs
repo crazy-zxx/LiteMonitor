@@ -19,6 +19,8 @@ namespace LiteMonitor
         public static ContextMenuStrip Build(MainForm form, Settings cfg, UIController? ui, string targetPage = null)
         {
             var menu = new ContextMenuStrip();
+            // 标记是否为任务栏模式 (影响监控项的勾选逻辑)
+            bool isTaskbarMode = targetPage == "Taskbar";
 
             // ==================================================================================
             // 1. 基础功能区 (置顶、显示模式、任务栏开关、隐藏主界面/托盘)
@@ -253,6 +255,9 @@ namespace LiteMonitor
             // ==================================================================================
             // 2. 显示监控项 (动态生成)
             // ==================================================================================
+            // [修改] 增加 targetPage 判断：
+            // - 如果在主界面右键，操作 VisibleInPanel
+            // - 如果在任务栏右键，操作 VisibleInTaskbar
 
             var grpShow = new ToolStripMenuItem(LanguageManager.T("Menu.MonitorItemDisplay"));
             menu.Items.Add(grpShow);
@@ -327,8 +332,10 @@ namespace LiteMonitor
                     string groupLabel = LanguageManager.T("Groups." + groupKey);
                     if (string.IsNullOrEmpty(groupLabel)) groupLabel = groupKey;
 
-                    // 状态判断
-                    bool isAnyVisible = groupItems.Any(x => x.VisibleInPanel);
+                    // 状态判断：根据是否是任务栏模式，检查不同属性
+                    bool isAnyVisible = isTaskbarMode
+                        ? groupItems.Any(x => x.VisibleInTaskbar)
+                        : groupItems.Any(x => x.VisibleInPanel);
 
                     var groupMenu = new ToolStripMenuItem(groupLabel)
                     {
@@ -341,7 +348,10 @@ namespace LiteMonitor
                         bool newState = groupMenu.Checked;
                         foreach (var gItem in groupItems)
                         {
-                            gItem.VisibleInPanel = newState;
+                            if (isTaskbarMode)
+                                gItem.VisibleInTaskbar = newState;
+                            else
+                                gItem.VisibleInPanel = newState;
                         }
                         cfg.Save();
                         AppActions.ApplyMonitorLayout(ui, form);
@@ -358,15 +368,22 @@ namespace LiteMonitor
                         : LanguageManager.T("Items." + itemConfig.Key);
                     if (string.IsNullOrEmpty(label)) label = itemConfig.Key;
 
+                    // 状态判断
+                    bool isVisible = isTaskbarMode ? itemConfig.VisibleInTaskbar : itemConfig.VisibleInPanel;
+
                     var menuItem = new ToolStripMenuItem(label)
                     {
-                        Checked = itemConfig.VisibleInPanel,
+                        Checked = isVisible,
                         CheckOnClick = true
                     };
 
                     menuItem.CheckedChanged += (_, __) =>
                     {
-                        itemConfig.VisibleInPanel = menuItem.Checked;
+                        if (isTaskbarMode)
+                            itemConfig.VisibleInTaskbar = menuItem.Checked;
+                        else
+                            itemConfig.VisibleInPanel = menuItem.Checked;
+
                         cfg.Save();
                         AppActions.ApplyMonitorLayout(ui, form);
 
