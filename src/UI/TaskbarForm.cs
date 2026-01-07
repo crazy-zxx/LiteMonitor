@@ -113,7 +113,7 @@ namespace LiteMonitor
                 _currentMenu = null;
             }
 
-            _currentMenu = MenuManager.Build(_mainForm, _cfg, _ui);
+            _currentMenu = MenuManager.Build(_mainForm, _cfg, _ui, "Taskbar");
             
             // 必须确保窗口激活，否则点击菜单外无法自动关闭
             SetForegroundWindow(this.Handle);

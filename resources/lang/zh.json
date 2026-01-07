@@ -97,7 +97,7 @@
     "TaskbarAlignRight": "任务栏右侧",
     "TaskbarAlignLeft": "任务栏左侧",
     "TaskbarOffset": "左右偏移量",
-    "TaskbarAlignTip": "⚠️win11任务栏为居中对齐时，可设置任务栏左侧显示; 左右偏移量可使用正负数如：10px -20px",
+    "TaskbarAlignTip": "⚠️仅win11任务栏为居中对齐时，可设置任务栏左侧显示; 左右偏移量可使用正负数如：10px -20px",
 
     "TaskbarCustomColors": "自定义任务栏颜色",
     "TaskbarCustomTip": "⚠️注意：自定义颜色仅在启用后可设置，字体背景色请吸取系统任务栏的颜色，否则可能出现花字",

@@ -16,7 +16,7 @@ namespace LiteMonitor
         /// <summary>
         /// 构建 LiteMonitor 主菜单（右键菜单 + 托盘菜单）
         /// </summary>
-        public static ContextMenuStrip Build(MainForm form, Settings cfg, UIController? ui)
+        public static ContextMenuStrip Build(MainForm form, Settings cfg, UIController? ui, string targetPage = null)
         {
             var menu = new ContextMenuStrip();
 
@@ -456,6 +456,7 @@ namespace LiteMonitor
                     // 打开设置窗口
                     using (var f = new LiteMonitor.src.UI.SettingsForm(cfg, ui, form))
                     {
+                        if (!string.IsNullOrEmpty(targetPage)) f.SwitchPage(targetPage);
                         f.ShowDialog(form);
                     }
                 }
