@@ -196,8 +196,8 @@ namespace LiteMonitor.src.SystemServices
                     {
                         if (!t.Value.HasValue) continue;
                         float v = t.Value.Value;
-                        // 过滤掉 0 和 >150 的异常读数
-                        if (v > 0 && v < 150 && v > maxVal) 
+                        // 过滤掉 0 和 >110 的异常读数
+                        if (v > 0 && v < 110 && v > maxVal) 
                         { 
                             maxVal = v; 
                             best = t; 
