@@ -77,13 +77,13 @@ namespace LiteMonitor.src.Core
             int dot = key.IndexOf('.');
             return dot >= 0 ? key[(dot + 1)..] : key;
         }
-        public static string T(string key)
+        public static string T(string key)         
         {
             // 1. 优先检查用户自定义覆盖
-            if (_overrides.TryGetValue(key, out var overrideVal)) return overrideVal;
+            if (_overrides.TryGetValue(key, out var overrideVal)) return UIUtils.Intern(overrideVal);
 
-            // 2. 没有覆盖，就直接复用基础逻辑
-            return GetOriginal(key);
+            // 2. 没有覆盖，就直接复用基础逻辑并驻留结果
+            return UIUtils.Intern(GetOriginal(key));
         }
 
         // ★★★ 优化: Intern 驻留 Key 字符串，防止 Items.CPU.XXX 重复 ★★★

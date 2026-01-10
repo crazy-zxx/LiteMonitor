@@ -21,9 +21,20 @@ namespace LiteMonitor
             get => _key;
             set => _key = UIUtils.Intern(value); 
         }
-        public string Label { get; set; } = "";
+        private string _label = "";
+        public string Label 
+        {
+            get => _label;
+            set => _label = UIUtils.Intern(value);
+        }
+        
         // ★★★ 新增：缓存短标签 (用于任务栏/横屏模式) ★★★
-        public string ShortLabel { get; set; } = "";
+        private string _shortLabel = "";
+        public string ShortLabel 
+        {
+            get => _shortLabel;
+            set => _shortLabel = UIUtils.Intern(value);
+        }
         
         public float? Value { get; set; } = null;
         public float DisplayValue { get; set; } = 0f;

@@ -86,8 +86,9 @@ namespace LiteMonitor
                 foreach (var col in cols)
                 {
                     // ===== label（Top/Bottom 按最大宽度） =====
-                    string labelTop = col.Top != null ? LanguageManager.T(UIUtils.Intern($"Short.{col.Top.Key}")) : "";
-                    string labelBottom = col.Bottom != null ? LanguageManager.T(UIUtils.Intern($"Short.{col.Bottom.Key}")) : "";
+                    // ★★★ 修复：使用MetricItem中已经缓存的ShortLabel，避免重复创建字符串 ★★★
+                    string labelTop = col.Top != null ? col.Top.ShortLabel : "";
+                    string labelBottom = col.Bottom != null ? col.Bottom.ShortLabel : "";
 
                     Font labelFont, valueFont;
 
