@@ -59,6 +59,9 @@ namespace LiteMonitor.src.SystemServices
                 // ★★★ 优化 T0：关闭 PCI 控制器扫描，省下 2 万个对象 (约 8MB) ★★★
                 // 除非你需要极底层的 SuperIO 调试，否则不需要开这个
                 IsControllerEnabled = true, 
+
+                // 顺便确保 PSU 也关闭（通常不需要监控电源模块，除非是高端 Corsair 电源）
+                IsPsuEnabled = false
             };
 
             // 2. 初始化服务
