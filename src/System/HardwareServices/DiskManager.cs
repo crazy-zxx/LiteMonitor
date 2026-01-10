@@ -14,11 +14,15 @@ namespace LiteMonitor.src.SystemServices
         // 磁盘智能缓存
         private IHardware? _cachedDiskHw;
         private DateTime _lastDiskScan = DateTime.MinValue;
+        // ★★★ [新增] 静态缓存：避免 DriveInfo 重复创建 ★★★
+        private static readonly Dictionary<string, DriveInfo> _driveInfoCache = new();
 
         public void ClearCache()
         {
             _diskLastActiveTime.Clear();
             _cachedDiskHw = null;
+            // 可以选择清理 DriveInfo 缓存，也可以保留（因为它通常不变）
+            _driveInfoCache.Clear();
         }
 
         // ===========================================================
@@ -103,7 +107,37 @@ namespace LiteMonitor.src.SystemServices
                         return cachedVal;
                 }
             }
+            // === [核心修复] 逻辑分区处理：使用缓存的 DriveInfo ===
+            // key 格式如: DISK.C.Used
+            var parts = key.Split('.');
+            if (parts.Length >= 3 && parts[1].Length == 1 && char.IsLetter(parts[1][0]))
+            {
+                string driveLetter = parts[1]; // "C"
+                string type = parts[2];        // "Used"
+                string root = driveLetter + ":\\";
 
+                DriveInfo di;
+                // ★★★ 优先查缓存 ★★★
+                if (!_driveInfoCache.TryGetValue(root, out di))
+                {
+                    try 
+                    { 
+                        di = new DriveInfo(root); 
+                        _driveInfoCache[root] = di; // 存入缓存
+                    } 
+                    catch { return null; }
+                }
+
+                if (type == "Used") 
+                {
+                    try 
+                    { 
+                        // IsReady 不会产生 Volume 字符串垃圾
+                        if (di.IsReady) return (100f - (float)((double)di.TotalFreeSpace / di.TotalSize * 100.0));
+                    } 
+                    catch { return 0f; }
+                }
+            }
             // ★★★ [新增] B. 尝试启动时缓存 (Settings 记忆) ★★★
             if (_cachedDiskHw == null && !string.IsNullOrEmpty(cfg.LastAutoDisk))
             {

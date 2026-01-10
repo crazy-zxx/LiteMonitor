@@ -22,7 +22,11 @@ namespace LiteMonitor.src.SystemServices
         private PerformanceCounter? _cpuPerfCounter;
         private float _lastSystemCpuLoad = 0f;
 
-        // ★★★ [新增 1] Tick 级智能缓存 (防止同帧重复计算) ★★★
+        // ★★★ [新增] 错误重试计数器，防止无限重建 ★★★
+        private int _perfCounterErrorCount = 0;
+        private DateTime _lastPerfCounterRetry = DateTime.MinValue;
+
+        // ★★★ [新增] Tick 级智能缓存 (防止同帧重复计算) ★★★
         private readonly Dictionary<string, float> _tickCache = new();
 
         public HardwareValueProvider(Computer c, Settings s, SensorMap map, NetworkManager net, DiskManager disk, object syncLock, Dictionary<string, float> lastValid)
@@ -38,21 +42,35 @@ namespace LiteMonitor.src.SystemServices
 
         public void UpdateSystemCpuCounter()
         {
-            // ★★★ [新增 2] 每一轮更新开始时，清空本轮缓存 ★★★
+            // ★★★ [新增] 每一轮更新开始时，清空本轮缓存 ★★★
             _tickCache.Clear();
 
-            // ... (以下保持原有逻辑) ...
             if (_cfg.UseSystemCpuLoad)
             {
+                // ★★★ [优化] 智能重试机制：失败 10 次后，每 30 秒才重试一次 ★★★
                 if (_cpuPerfCounter == null)
                 {
-                    try { _cpuPerfCounter = new PerformanceCounter("Processor Information", "% Processor Utility", "_Total"); }
+                    if (_perfCounterErrorCount > 10 && (DateTime.Now - _lastPerfCounterRetry).TotalSeconds < 30)
+                        return; // 冷却中，跳过
+
+                    try 
+                    { 
+                        _cpuPerfCounter = new PerformanceCounter("Processor Information", "% Processor Utility", "_Total"); 
+                        _lastPerfCounterRetry = DateTime.Now;
+                    }
                     catch 
                     {
-                        try { _cpuPerfCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total"); }
-                        catch { }
+                        try 
+                        { 
+                            _cpuPerfCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total"); 
+                            _lastPerfCounterRetry = DateTime.Now;
+                        }
+                        catch { _perfCounterErrorCount++; }
                     }
-                    if (_cpuPerfCounter != null) _cpuPerfCounter.NextValue();
+                    if (_cpuPerfCounter != null) 
+                    {
+                         try { _cpuPerfCounter.NextValue(); _perfCounterErrorCount = 0; } catch { }
+                    }
                 }
 
                 if (_cpuPerfCounter != null)
@@ -62,8 +80,14 @@ namespace LiteMonitor.src.SystemServices
                         float rawVal = _cpuPerfCounter.NextValue();
                         if (rawVal > 100f) rawVal = 100f;
                         _lastSystemCpuLoad = rawVal;
+                        _perfCounterErrorCount = 0; // 成功则重置错误计数
                     }
-                    catch { _cpuPerfCounter.Dispose(); _cpuPerfCounter = null; }
+                    catch 
+                    { 
+                        _cpuPerfCounter.Dispose(); 
+                        _cpuPerfCounter = null; 
+                        _perfCounterErrorCount++; 
+                    }
                 }
             }
             else
@@ -71,6 +95,7 @@ namespace LiteMonitor.src.SystemServices
                 if (_cpuPerfCounter != null) { _cpuPerfCounter.Dispose(); _cpuPerfCounter = null; }
             }
         }
+
 
         // ===========================================================
         // ===================== 公共取值入口 =========================
