@@ -46,6 +46,15 @@ namespace LiteMonitor
         private float _cachedDisplayValue = -99999f; // 上一次格式化时的数值
         private string _cachedNormalText = "";       // 缓存竖屏文本
         private string _cachedHorizontalText = "";   // 缓存横屏/任务栏文本
+        public int CachedColorState { get; private set; } = 0;// [新增] 缓存颜色状态    
+        public double CachedPercent { get; private set; } = 0.0;// [新增] 缓存进度条百分比 (0.0 ~ 1.0)
+
+        // [新增] 面向对象的方法：给我主题，我给你我的颜色
+        // 渲染器调用这个方法，读起来非常像自然语言
+        public Color GetTextColor(Theme t)
+        {
+            return UIUtils.GetStateColor(CachedColorState, t, true);
+        }
 
         /// <summary>
         /// 获取格式化后的文本（带缓存机制）
@@ -53,20 +62,20 @@ namespace LiteMonitor
         /// <param name="isHorizontal">是否为横屏/任务栏模式（需要极简格式）</param>
         public string GetFormattedText(bool isHorizontal)
         {
-            // [保留优化] 阈值检查：防止浮点数微小抖动导致重绘
+            // 仅在数值变化时触发 (Tick 级更新)
             if (Math.Abs(DisplayValue - _cachedDisplayValue) > 0.05f)
             {
                 _cachedDisplayValue = DisplayValue;
-
-                // 1. 重新生成基础字符串
                 _cachedNormalText = UIUtils.FormatValue(Key, DisplayValue);
-
-                // 2. 重新生成横屏字符串
-                // 配合 UIUtils.FormatHorizontalValue 的去正则优化，这里效率极高
                 _cachedHorizontalText = UIUtils.FormatHorizontalValue(_cachedNormalText);
-            }
 
-            // 返回对应模式的缓存
+                // 1. 计算并缓存颜色状态
+                CachedColorState = UIUtils.GetColorResult(Key, DisplayValue);
+
+                // 2. ★★★ 计算并缓存进度条百分比 ★★★
+                // 这样 DrawBar 就不用再做 IndexOf 字符串匹配了
+                CachedPercent = UIUtils.GetUnifiedPercent(Key, DisplayValue);
+            }
             return isHorizontal ? _cachedHorizontalText : _cachedNormalText;
         }
 

@@ -104,14 +104,14 @@ namespace LiteMonitor
             string valText = it.GetFormattedText(false);
             
             
-            Color valColor = UIUtils.GetColor(it.Key, it.DisplayValue, t);
+            Color valColor = it.GetTextColor(t);
 
             TextRenderer.DrawText(g, valText, t.FontValue, it.ValueRect,
                 valColor,
                 TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
 
             // Bar - 注意：这里调用的是 UIUtils.DrawBar，它现在已经使用了优化的画刷逻辑
-            UIUtils.DrawBar(g, it.BarRect, it.DisplayValue, it.Key, t);
+            UIUtils.DrawBar(g, it, t);
         }
 
         /// <summary>
@@ -134,7 +134,7 @@ namespace LiteMonitor
             string valText = it.GetFormattedText(t.Layout.Width < 240 * t.Layout.LayoutScale);
             // 窄屏处理
             if (t.Layout.Width < 240*t.Layout.LayoutScale) valText = UIUtils.FormatHorizontalValue(valText);
-            Color valColor = UIUtils.GetColor(it.Key, it.Value ?? 0, t);
+            Color valColor = it.GetTextColor(t);
 
             TextRenderer.DrawText(g, valText, t.FontValue, it.ValueRect,
                 valColor,

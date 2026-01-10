@@ -94,13 +94,13 @@ namespace LiteMonitor
             {
                 // 自定义模式：忽略系统明暗，强制使用自定义色
                 labelColor = _cLabel;
-                valueColor = PickCustomColor(item.Key, item.DisplayValue);
+                valueColor = GetCustomStateColor(item.CachedColorState);
             }
             else
             {
                 // 原有模式
                 labelColor = light ? LABEL_LIGHT : LABEL_DARK;
-                valueColor = PickColor(item.Key, item.DisplayValue, light);
+                valueColor = GetStateColor(item.CachedColorState, light);
             }
             // Label 左对齐
             TextRenderer.DrawText(
@@ -120,25 +120,20 @@ namespace LiteMonitor
                 TextFormatFlags.NoClipping
             );
         }
-        // ★★★ [新增] 自定义颜色提取逻辑 ★★★
-        private static Color PickCustomColor(string key, double v)
+        // [新增] 辅助：根据状态快速获取颜色 (替代原来的 PickColor)
+        private static Color GetStateColor(int state, bool light)
         {
-            if (double.IsNaN(v)) return _cLabel;
-            int result = UIUtils.GetColorResult(key, v);
-            if (result == 2) return _cCrit;
-            if (result == 1) return _cWarn;
-            return _cSafe;
+            if (state == 2) return light ? CRIT_LIGHT : CRIT_DARK;
+            if (state == 1) return light ? WARN_LIGHT : WARN_DARK;
+            return light ? SAFE_LIGHT : SAFE_DARK;
         }
-        private static Color PickColor(string key, double v, bool light)
-        {
-            if (double.IsNaN(v)) return light ? LABEL_LIGHT : LABEL_DARK;
-            
-            // 调用核心逻辑
-            int result = UIUtils.GetColorResult(key, v); 
 
-            if (result == 2) return light ? CRIT_LIGHT : CRIT_DARK; // 翻译为硬编码的红色
-            if (result == 1) return light ? WARN_LIGHT : WARN_DARK; // 翻译为硬编码的黄色
-            return light ? SAFE_LIGHT : SAFE_DARK;                   // 翻译为硬编码的绿色
+        // [新增] 辅助：自定义模式
+        private static Color GetCustomStateColor(int state)
+        {
+            if (state == 2) return _cCrit;
+            if (state == 1) return _cWarn;
+            return _cSafe;
         }
     }
 }

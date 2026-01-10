@@ -297,6 +297,15 @@ namespace LiteMonitor.src.Core
             return ThemeManager.ParseColor(t.Color.ValueSafe);
         }
 
+        // [新增] 名字明确，专门用于“已知状态，求颜色”
+        // 这里的 int state 就是 0(Safe), 1(Warn), 2(Crit)
+        public static Color GetStateColor(int state, Theme t, bool isValueText = true)
+        {
+            if (state == 2) return ThemeManager.ParseColor(isValueText ? t.Color.ValueCrit : t.Color.BarHigh);
+            if (state == 1) return ThemeManager.ParseColor(isValueText ? t.Color.ValueWarn : t.Color.BarMid);
+            return ThemeManager.ParseColor(t.Color.ValueSafe);
+        }
+
         /// <summary>
         /// 核心：计算当前指标处于哪个报警级别 (0=Safe, 1=Warn, 2=Crit)
         /// </summary>
@@ -429,82 +438,55 @@ namespace LiteMonitor.src.Core
             using var path = RoundRect(r, radius);
             g.FillPath(brush, path);
         }
-
-        // ============================================================
-        // ⑤ 完整进度条 (恢复最低 5% 版本)
-        // ★★★ 优化：复用 GetBrush 方法 ★★★
-        // ============================================================
-        public static void DrawBar(Graphics g, Rectangle bar, double value, string key, Theme t)
+        // [新增] 统一获取进度条的百分比 (0.0 ~ 1.0)
+        // 把那段 if/else 逻辑搬到这里
+        public static double GetUnifiedPercent(string key, double value)
         {
-            // ★★★ [FIX] 进度条背景也需要防崩 ★★★
-            if (bar.Width <= 0 || bar.Height <= 0) return;
-
-            // 1. 绘制背景槽 - 使用缓存画刷
-            using (var bgPath = RoundRect(bar, bar.Height / 2))
-            {
-                g.FillPath(GetBrush(t.Color.BarBackground), bgPath);
-            }
-
-            // =========================================================
-            // ★★★ 优化核心：一次计算，两处使用 ★★★
-            // =========================================================
-            // ★★★ 优化：消除 ToUpperInvariant，改用 IndexOf 忽略大小写 ★★★
-            // string k = key.ToUpperInvariant();
-            double percent;
-
-            // A. 统一计算进度百分比 (0.0 ~ 1.0)
-            // ---------------------------------------------------------
-            // ★★★ [新增] 风扇支持 ★★★
+            // 1. 自适应指标 (频率/功耗/风扇) -> 调用之前的 GetAdaptivePercentage
             if (key.IndexOf("CLOCK", StringComparison.OrdinalIgnoreCase) >= 0 || 
                 key.IndexOf("POWER", StringComparison.OrdinalIgnoreCase) >= 0 || 
                 key.IndexOf("FAN", StringComparison.OrdinalIgnoreCase) >= 0 || 
                 key.IndexOf("PUMP", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                // 复用 GetAdaptivePercentage (内部封装了读取 Settings 和 Max 的逻辑)
-                // 避免了在 DrawBar 里重写一遍 Settings 读取代码
-                percent = GetAdaptivePercentage(key, value);
+                return GetAdaptivePercentage(key, value);
             }
-            else
+            
+            // 2. 普通指标 (Load/Temp/Mem) -> 默认 0-100 归一化
+            return value / 100.0;
+        }
+
+        // [修改] DrawBar 彻底瘦身：只负责画，不负责算
+        public static void DrawBar(Graphics g, MetricItem item, Theme t)
+        {
+            if (item.BarRect.Width <= 0 || item.BarRect.Height <= 0) return;
+
+            // 1. 背景
+            using (var bgPath = RoundRect(item.BarRect, item.BarRect.Height / 2))
             {
-                // 普通数据 (Load/Temp/Mem) 默认为 0-100，直接除以 100 归一化
-                percent = value / 100.0;
+                g.FillPath(GetBrush(t.Color.BarBackground), bgPath);
             }
 
-            // B. 确定颜色 (就地判断，避免调用 GetColorResult 导致重复计算)
-            // ---------------------------------------------------------
-            // 逻辑：将 0~1 的 percent 还原为 0~100 的数值，与配置文件的阈值 (如 60, 85) 对比
-            // 这样既省去了计算，又保证了颜色策略与 GetColorResult 保持完全一致
-            var (warn, crit) = GetThresholds(key);
-            double valForCheck = percent * 100.0;
+            // 2. ★★★ 直接使用缓存的百分比，零计算！ ★★★
+            double percent = item.CachedPercent; 
 
-            string colorCode;
-            if (valForCheck >= crit) colorCode = t.Color.BarHigh;
-            else if (valForCheck >= warn) colorCode = t.Color.BarMid;
-            else colorCode = t.Color.BarLow;
-
-            // C. 绘制前景条
-            // ---------------------------------------------------------
-            // 限制范围 5% ~ 100% (视觉优化)
+            // 视觉微调：限制在 5% - 100% 之间
             percent = Math.Max(0.05, Math.Min(1.0, percent));
 
-            int w = (int)(bar.Width * percent);
-            // 确保至少有 2px 宽度，避免圆角绘制异常
+            int w = (int)(item.BarRect.Width * percent);
             if (w < 2) w = 2;
+
+            // 3. 直接使用缓存的颜色状态，零计算！
+            Color barColor = GetStateColor(item.CachedColorState, t, false);
 
             if (w > 0)
             {
-                var filled = new Rectangle(bar.X, bar.Y, w, bar.Height);
-
-                // 简单防越界
-                if (filled.Width > bar.Width) filled.Width = bar.Width;
-
-                // ★★★ [FIX] 绘制前景条时也要检查 RoundRect 
+                var filled = new Rectangle(item.BarRect.X, item.BarRect.Y, w, item.BarRect.Height);
                 if (filled.Width > 0 && filled.Height > 0)
                 {
                     using (var fgPath = RoundRect(filled, filled.Height / 2))
+                    using (var brush = new SolidBrush(barColor))
                     {
-                        // 优化：使用缓存的前景画刷
-                        g.FillPath(GetBrush(colorCode), fgPath);
+                        g.FillPath(brush, fgPath);
                     }
                 }
             }

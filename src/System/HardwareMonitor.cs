@@ -340,8 +340,7 @@ namespace LiteMonitor.src.SystemServices
                         // 只列出 Fan 类型 (转速)
                         if (s.SensorType == SensorType.Fan)
                         {
-                            // 格式化名称：传感器名[硬件名] 
-                            // ★★★ 强制驻留：确保生成的 "Fan #1 [SuperIO]" 只在内存存一份 ★★★
+                            // 格式化名称：传感器名[硬件名]  "Fan #1 [SuperIO]" 
                             string fullName = $"{s.Name} [{hw.Name}]";
                             list.Add(fullName);
                         }

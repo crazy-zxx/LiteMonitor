@@ -294,10 +294,10 @@ namespace LiteMonitor
                 foreach (var itemConfig in sortedItems)
                 {
                     // 1. 拼接名称
-                    string full = LanguageManager.T("Items." + itemConfig.Key);
+                    string full = LanguageManager.T(UIUtils.Intern("Items." + itemConfig.Key));
                     if (full.StartsWith("Items.")) full = itemConfig.Key;
                     
-                    string shortName = LanguageManager.T("Short." + itemConfig.Key);
+                    string shortName = LanguageManager.T(UIUtils.Intern("Short." + itemConfig.Key));
                     if (shortName.StartsWith("Short.")) shortName = itemConfig.Key;
 
                     // 注意：这里保留了您提供的 $"{shortName} ({full})" 格式 (例如: "Up (上传速度)")
@@ -345,14 +345,14 @@ namespace LiteMonitor
                 foreach (var g in groups)
                 {
                     // 分组标题
-                    string gName = LanguageManager.T("Groups." + g.Key);
+                    string gName = LanguageManager.T(UIUtils.Intern("Groups." + g.Key));
                     if (cfg.GroupAliases.ContainsKey(g.Key)) gName = cfg.GroupAliases[g.Key];
                     
                     monitorRoot.DropDownItems.Add(new ToolStripMenuItem(gName) { Enabled = false, ForeColor = Color.Gray });
 
                     foreach (var itemConfig in g)
                     {
-                        string def = LanguageManager.T("Items." + itemConfig.Key);
+                        string def = LanguageManager.T(UIUtils.Intern("Items." + itemConfig.Key));
                         if (def.StartsWith("Items.")) def = itemConfig.Key;
                         string label = string.IsNullOrEmpty(itemConfig.UserLabel) ? def : itemConfig.UserLabel;
 

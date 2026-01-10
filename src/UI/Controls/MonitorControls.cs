@@ -61,7 +61,7 @@ namespace LiteMonitor.src.UI.Controls
             };
 
             // 2. Name Label (任务栏模式)
-            string defName = LanguageManager.T("Items." + item.Key);
+            string defName = LanguageManager.T(UIUtils.Intern("Items." + item.Key));
             string valName = string.IsNullOrEmpty(item.UserLabel) ? defName : item.UserLabel;
             _lblName = new Label
             {
@@ -80,7 +80,7 @@ namespace LiteMonitor.src.UI.Controls
             { Location = new Point(MonitorLayout.X_COL2, UIUtils.S(8)) };
 
             // 4. Short Input
-            string defShortKey = "Short." + item.Key;
+            string defShortKey = UIUtils.Intern("Short." + item.Key);
             string defShort = LanguageManager.T(defShortKey);
             if (defShort.StartsWith("Short.")) defShort = item.Key.Split('.')[1]; 
             string valShort = string.IsNullOrEmpty(item.TaskbarLabel) ? defShort : item.TaskbarLabel;
@@ -146,11 +146,11 @@ namespace LiteMonitor.src.UI.Controls
         public void SyncToConfig()
         {
             string valName = _inputName.Inner.Text.Trim();
-            string originalName = LanguageManager.GetOriginal("Items." + Config.Key);
+            string originalName = LanguageManager.GetOriginal(UIUtils.Intern("Items." + Config.Key));
             Config.UserLabel = string.Equals(valName, originalName, StringComparison.OrdinalIgnoreCase) ? "" : valName;
 
             string valShort = _inputShort.Inner.Text.Trim();
-            string originalShort = LanguageManager.GetOriginal("Short." + Config.Key);
+            string originalShort = LanguageManager.GetOriginal(UIUtils.Intern("Short." + Config.Key));
             Config.TaskbarLabel = string.Equals(valShort, originalShort, StringComparison.OrdinalIgnoreCase) ? "" : valShort;
 
             Config.VisibleInPanel = _chkPanel.Checked;
