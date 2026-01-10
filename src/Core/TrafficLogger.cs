@@ -65,7 +65,7 @@ namespace LiteMonitor.src.Core
         // 核心：累加数据
         public static void AddTraffic(long upBytes, long downBytes)
         {
-            string key = DateTime.Today.ToString("yyyy-MM-dd");
+            string key = UIUtils.Intern(DateTime.Today.ToString("yyyy-MM-dd"));
 
             // 线程安全注意：虽然 UI 读取和 Update 写入可能并发，但 Dictionary 非线程安全。
             // 考虑到冲突概率极低（UI 只读，Update 只写），暂不加重锁，或者简单加锁：
@@ -84,7 +84,7 @@ namespace LiteMonitor.src.Core
         // 获取今日数据 (供 UI 显示)
         public static (long up, long down) GetTodayStats()
         {
-            string key = DateTime.Today.ToString("yyyy-MM-dd");
+            string key = UIUtils.Intern(DateTime.Today.ToString("yyyy-MM-dd"));
             lock (Data)
             {
                 if (Data.History.TryGetValue(key, out var rec))

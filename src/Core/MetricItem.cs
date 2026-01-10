@@ -13,7 +13,14 @@ namespace LiteMonitor
 
     public class MetricItem
     {
-        public string Key { get; set; } = "";
+        private string _key = "";
+        
+        // ★★★ 修复：强制驻留字符串，消除重复的 "CPU.CLOCK" 等实例 ★★★
+        public string Key 
+        { 
+            get => _key;
+            set => _key = UIUtils.Intern(value); 
+        }
         public string Label { get; set; } = "";
         
         public float? Value { get; set; } = null;

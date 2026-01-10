@@ -221,10 +221,40 @@ namespace LiteMonitor
             }
 
             s.SyncToLanguage();
+            // ★★★ 新增：深度字符串去重 (Deep Intern) ★★★
+            s.InternAllStrings();
             
             // 赋值单例
             _instance = s;
             return s;
+        }
+
+        // ★★★ 新增：辅助方法，清理配置中的重复字符串 ★★★
+        private void InternAllStrings()
+        {
+            // 1. 清理监控项 Keys
+            if (MonitorItems != null)
+            {
+                foreach (var item in MonitorItems)
+                {
+                    if (item != null)
+                    {
+                        item.Key = UIUtils.Intern(item.Key);
+                        // 如果 MonitorItemConfig 有其他 string 字段(如 Name)，也一并 Intern
+                    }
+                }
+            }
+
+            // 2. 清理硬件标识符 (解决 \\?\storage... 重复问题)
+            PreferredDisk = UIUtils.Intern(PreferredDisk);
+            LastAutoDisk = UIUtils.Intern(LastAutoDisk);
+            PreferredNetwork = UIUtils.Intern(PreferredNetwork);
+            LastAutoNetwork = UIUtils.Intern(LastAutoNetwork);
+            
+            // 3. 清理风扇配置
+            PreferredCpuFan = UIUtils.Intern(PreferredCpuFan);
+            PreferredCpuPump = UIUtils.Intern(PreferredCpuPump);
+            PreferredCaseFan = UIUtils.Intern(PreferredCaseFan);
         }
 
         /// <summary>
