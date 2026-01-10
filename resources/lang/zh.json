@@ -162,7 +162,7 @@
     "MaxLimits": "最大值",
     "CalibrationTip": "⚠️为了进度条显示更准确，请填写硬件实际的最大值，不填将在高负载时自动学习并更新最大值",
 
-    "HardwareSettings": "硬件设置",
+    "HardwareSettings": "硬件与传感器设置",
     "DiskSource": "首选磁盘",
     "NetworkSource": "首选网卡",
     "Auto": "自动模式",

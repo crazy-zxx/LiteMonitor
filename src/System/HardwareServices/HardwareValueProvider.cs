@@ -245,8 +245,45 @@ namespace LiteMonitor.src.SystemServices
                     }
                 }
             }
+            // [插入/修改逻辑]
+            else if (key == "MOBO.Temp" && !string.IsNullOrEmpty(_cfg.PreferredMoboTemp))
+            {
+                string pref = _cfg.PreferredMoboTemp; // 格式: "温度 1 [ITE IT8686E]"
+                int idx = pref.LastIndexOf('[');
+                if (idx > 0)
+                {
+                    string targetSensor = pref.Substring(0, idx).Trim();
+                    string targetHw = pref.Substring(idx + 1).TrimEnd(']');
 
-            // 9. 通用传感器查找 (兜底)
+                    // 局部递归查找指定硬件的指定传感器
+                    float? FindSpecific(IHardware h)
+                    {
+                        if (h.Name == targetHw)
+                        {
+                            foreach (var s in h.Sensors)
+                            {
+                                if (s.SensorType == SensorType.Temperature && s.Name == targetSensor)
+                                    return s.Value;
+                            }
+                        }
+                        foreach (var sub in h.SubHardware)
+                        {
+                            var v = FindSpecific(sub);
+                            if (v.HasValue) return v;
+                        }
+                        return null;
+                    }
+
+                    // 遍历所有硬件寻找匹配项
+                    foreach (var hw in _computer.Hardware)
+                    {
+                        result = FindSpecific(hw);
+                        if (result.HasValue) break;
+                    }
+                }
+            }
+
+            // 10. 通用传感器查找 (兜底)
             if (result == null)
             {
                 lock (_lock)

@@ -31,6 +31,7 @@ namespace LiteMonitor.src.SystemServices
         private List<string>? _cachedFanList = null; 
         private List<string>? _cachedNetworkList = null; // 网卡列表缓存
         private List<string>? _cachedDiskList = null;    // 硬盘列表缓存
+        private List<string>? _cachedMoboTempList = null; // 主板温度列表缓存
 
         private DateTime _lastTrafficTime = DateTime.Now;
         private DateTime _lastTrafficSave = DateTime.Now;
@@ -201,6 +202,7 @@ namespace LiteMonitor.src.SystemServices
                     _cachedFanList = null;
                     _cachedNetworkList = null;
                     _cachedDiskList = null;
+                    _cachedMoboTempList = null;
 
                     // 2. ★★★ 清理字符串池 (配合 UIUtils 的新功能) ★★★
                     UIUtils.ClearStringPool();
@@ -368,6 +370,48 @@ namespace LiteMonitor.src.SystemServices
             // 存入缓存
             Instance._cachedFanList = list.Distinct().ToList();
             return Instance._cachedFanList;
+        }
+
+        // 列出所有适合作为"主板/系统温度"的传感器
+        public static List<string> ListAllMoboTemps()
+        {
+            if (Instance == null) return new List<string>();
+            if (Instance._cachedMoboTempList != null) return Instance._cachedMoboTempList;
+
+            var list = new List<string>();
+
+            void ScanHardware(IHardware hw)
+            {
+                // 排除逻辑：只想要主板上的传感器，排除 CPU核心、显卡、硬盘、内存条、网卡
+                bool isExcluded = hw.HardwareType == HardwareType.Cpu ||
+                                hw.HardwareType == HardwareType.GpuNvidia ||
+                                hw.HardwareType == HardwareType.GpuAmd ||
+                                hw.HardwareType == HardwareType.GpuIntel ||
+                                hw.HardwareType == HardwareType.Storage ||
+                                hw.HardwareType == HardwareType.Memory ||
+                                hw.HardwareType == HardwareType.Network;
+
+                if (!isExcluded)
+                {
+                    foreach (var s in hw.Sensors)
+                    {
+                        if (s.SensorType == SensorType.Temperature)
+                        {
+                            // 格式：传感器名 [硬件名]
+                            string fullName = $"{s.Name} [{hw.Name}]";
+                            list.Add(fullName);
+                        }
+                    }
+                }
+
+                foreach (var sub in hw.SubHardware) ScanHardware(sub);
+            }
+
+            foreach (var hw in Instance._computer.Hardware) ScanHardware(hw);
+
+            list.Sort();
+            Instance._cachedMoboTempList = list.Distinct().ToList();
+            return Instance._cachedMoboTempList;
         }
 
         private static IEnumerable<ISensor> GetAllSensors(IHardware hw, SensorType type)

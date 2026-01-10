@@ -115,6 +115,19 @@ namespace LiteMonitor.src.UI.SettingsPage
         {
             var group = new LiteSettingsGroup(LanguageManager.T("Menu.HardwareSettings"));
             string strAuto = LanguageManager.T("Menu.Auto");
+            //  系统CPU算法
+            AddBool(group, "Menu.UseSystemCpuLoad", () => Config.UseSystemCpuLoad, v => Config.UseSystemCpuLoad = v);
+            
+            // 刷新率
+            int[] rates = { 100, 200, 300, 500, 600, 700, 800, 1000, 1500, 2000, 3000 };
+            AddCombo(group, "Menu.Refresh", rates.Select(r => r + " ms"),
+                () => Config.RefreshMs + " ms",
+                v => {
+                    int val = UIUtils.ParseInt(v);
+                    Config.RefreshMs = val < 50 ? 1000 : val;
+                }
+            );
+            group.AddFullItem(new LiteNote(LanguageManager.T("Menu.UseSystemCpuLoadTip"), 0));
 
             // 1. 磁盘源
             var disks = HardwareMonitor.ListAllDisks();
@@ -158,21 +171,18 @@ namespace LiteMonitor.src.UI.SettingsPage
                 v => Config.PreferredCaseFan = (v == strAuto) ? "" : v
             );
            
-            
-            // 5. 刷新率
-            int[] rates = { 100, 200, 300, 500, 600, 700, 800, 1000, 1500, 2000, 3000 };
-            AddCombo(group, "Menu.Refresh", rates.Select(r => r + " ms"),
-                () => Config.RefreshMs + " ms",
-                v => {
-                    int val = UIUtils.ParseInt(v);
-                    Config.RefreshMs = val < 50 ? 1000 : val;
-                }
+            // [新增] 4 主板温度源
+            var moboTemps = HardwareMonitor.ListAllMoboTemps();
+            moboTemps.Insert(0, strAuto);
+            AddCombo(group, "Items.MOBO.Temp", moboTemps,
+                () => string.IsNullOrEmpty(Config.PreferredMoboTemp) ? strAuto : Config.PreferredMoboTemp,
+                v => Config.PreferredMoboTemp = (v == strAuto) ? "" : v
             );
-
-             // 4. 其他设置
-            AddBool(group, "Menu.UseSystemCpuLoad", () => Config.UseSystemCpuLoad, v => Config.UseSystemCpuLoad = v);
-            group.AddFullItem(new LiteNote(LanguageManager.T("Menu.UseSystemCpuLoadTip"), 0));
             
+            
+            
+            
+
             AddGroupToPage(group);
         }
 

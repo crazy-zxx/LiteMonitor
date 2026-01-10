@@ -38,6 +38,7 @@ namespace LiteMonitor
         public string PreferredCpuFan { get; set; } = "";
         public string PreferredCpuPump { get; set; } = ""; // 保存用户选的水冷接口
         public string PreferredCaseFan { get; set; } = "";
+        public string PreferredMoboTemp { get; set; } = "";
 
         // 主窗体所在的屏幕设备名 (用于记忆上次位置)
         public string ScreenDevice { get; set; } = "";
@@ -256,6 +257,7 @@ namespace LiteMonitor
             PreferredCpuFan = UIUtils.Intern(PreferredCpuFan);
             PreferredCpuPump = UIUtils.Intern(PreferredCpuPump);
             PreferredCaseFan = UIUtils.Intern(PreferredCaseFan);
+            PreferredMoboTemp = UIUtils.Intern(PreferredMoboTemp);
             
             TaskbarFontFamily = UIUtils.Intern(TaskbarFontFamily);
         }
