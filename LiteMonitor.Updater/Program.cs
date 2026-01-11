@@ -3,19 +3,18 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Text; // ★ 必须添加引用
+using System.Text; 
 using System.Threading;
 
 namespace LiteMonitor.Updater
 {
     internal class Program
     {
-        private const string TaskName = "LiteMonitor_AutoStart";
         private const string ExeName = "LiteMonitor.exe";
 
         static void Main(string[] args)
         {
-            // ★★★ [修复乱码 Step 0] 注册编码提供程序以支持 GBK ★★★
+            // ★★★ [基础] 注册编码支持 (为智能识别做准备) ★★★
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
             if (args.Length == 0) return;
@@ -24,7 +23,7 @@ namespace LiteMonitor.Updater
             string resourcesDir = AppContext.BaseDirectory;
 
             // ===========================================================
-            // 1. 智能定位主程序目录（核心）
+            // 1. 智能定位主程序目录
             // ===========================================================
             string? baseDir = GetMainProgramDirectory(resourcesDir);
 
@@ -35,35 +34,27 @@ namespace LiteMonitor.Updater
             }
 
             // ===========================================================
-            // 2. 等待主程序退出
+            // 2. 等待主程序退出 (带缓冲)
             // ===========================================================
-            WaitExit("LiteMonitor");
+            string procName = Path.GetFileNameWithoutExtension(ExeName);
+            WaitExit(procName);
+            
+            // 给系统 1秒 缓冲时间，确保文件句柄彻底释放
+            Thread.Sleep(1000); 
 
             // ===========================================================
-            // 3. 解压到 LiteMonitor/_update_tmp
+            // 3. 解压到 LiteMonitor/_update_tmp 目录
             // ===========================================================
             string tempDir = Path.Combine(baseDir, "_update_tmp");
 
             try
             {
-                if (Directory.Exists(tempDir))
-                    Directory.Delete(tempDir, true);
-
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
                 Directory.CreateDirectory(tempDir);
-            }
-            catch (Exception ex)
-            {
-                LogError(baseDir, "无法创建临时目录： " + ex.Message);
-                return;
-            }
 
-            try
-            {
-                // ★★★ [修复乱码 Step 1] 显式指定使用 GBK 编码解压 ★★★
-                // 逻辑：如果 ZIP 内部标记了 UTF-8，.NET 会优先用 UTF-8；
-                // 如果没标记（旧版压缩工具），则使用我们传入的 GBK 解析中文。
-                var gbk = Encoding.GetEncoding("GBK");
-                ZipFile.ExtractToDirectory(zipFile, tempDir, gbk, true);
+                // ★★★ [核心修复] 智能识别编码解压 ★★★
+                // 自动判断是用 UTF-8 还是 GBK，杜绝乱码
+                ExtractZipSmart(zipFile, tempDir);
             }
             catch (Exception ex)
             {
@@ -72,12 +63,12 @@ namespace LiteMonitor.Updater
             }
 
             // ===========================================================
-            // 4. 处理 ZIP 的最外层目录 (忽略 LiteMonitor_v1.xx/)
+            // 4. 处理 ZIP 的最外层目录
             // ===========================================================
             string realFolder = ResolveZipRoot(tempDir);
 
             // ===========================================================
-            // 5. 覆盖更新文件（保留目录结构）
+            // 5. 覆盖更新文件 (带重试机制)
             // ===========================================================
             try
             {
@@ -86,12 +77,17 @@ namespace LiteMonitor.Updater
                     string rel = Path.GetRelativePath(realFolder, srcPath);
                     string destPath = Path.Combine(baseDir, rel);
 
-                    // ✔ 无论 ZIP 内 Updater 在根目录或子目录，都不覆盖自己
+                    // 跳过 Updater 自身
                     if (rel.EndsWith("Updater.exe", StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
-                    File.Copy(srcPath, destPath, true);
+
+                    // 使用带重试机制的复制
+                    if (!TryCopyFile(srcPath, destPath))
+                    {
+                        LogError(baseDir, $"无法覆盖文件 (被占用): {rel}");
+                    }
                 }
             }
             catch (Exception ex)
@@ -110,8 +106,78 @@ namespace LiteMonitor.Updater
             // ===========================================================
             RestartMain(baseDir);
         }
-        
-        // ------------------ 判断 LiteMonitor.exe（忽略大小写） ------------------
+
+        // ======================================================
+        // ★★★ [核心方法] 智能解压 (自动兼容 UTF-8 和 GBK) ★★★
+        // ======================================================
+        private static void ExtractZipSmart(string zipPath, string extractTo)
+        {
+            // 默认假设是标准 UTF-8
+            bool useGbk = false;
+
+            try 
+            {
+                // 1. 试探性打开：.NET 默认使用 UTF-8 解析
+                using (var archive = ZipFile.OpenRead(zipPath))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        // 检查文件名中是否有“未知字符”(Replacement Character )
+                        // 如果有，说明 UTF-8 解析失败，这肯定是一个 GBK 编码的旧版压缩包
+                        if (entry.FullName.Contains('\uFFFD'))
+                        {
+                            useGbk = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // 如果连头都读不出来，保险起见也尝试 GBK
+                useGbk = true;
+            }
+
+            // 2. 执行真正的解压
+            if (useGbk)
+            {
+                // 使用 GBK 解压 (解决旧版软件压缩包乱码)
+                var gbk = Encoding.GetEncoding("GBK");
+                ZipFile.ExtractToDirectory(zipPath, extractTo, gbk, true);
+            }
+            else
+            {
+                // 使用默认 UTF-8 解压 (解决 GitHub/新版压缩包乱码)
+                ZipFile.ExtractToDirectory(zipPath, extractTo, true);
+            }
+        }
+
+        // ------------------ 辅助方法 (重试机制) ------------------
+
+        private static bool TryCopyFile(string src, string dest)
+        {
+            // 最多重试 10 次，每次间隔 500ms (总共等待 5秒)
+            for (int i = 0; i < 10; i++)
+            {
+                try
+                {
+                    File.Copy(src, dest, true);
+                    return true; 
+                }
+                catch (IOException) // 文件被占用
+                {
+                    if (i == 9) return false; 
+                    Thread.Sleep(500); 
+                }
+                catch (UnauthorizedAccessException) // 权限不足
+                {
+                    if (i == 9) return false;
+                    Thread.Sleep(500);
+                }
+            }
+            return false;
+        }
+
         private static bool ContainsLiteMonitorExe(string dir)
         {
             return Directory.GetFiles(dir, "*", SearchOption.TopDirectoryOnly)
@@ -170,10 +236,16 @@ namespace LiteMonitor.Updater
 
         private static void WaitExit(string name)
         {
-            for (int i = 0; i < 80; i++)
+            // 等待最多 10 秒
+            for (int i = 0; i < 50; i++)
             {
-                if (Process.GetProcessesByName(name).Length == 0)
-                    return;
+                var processes = Process.GetProcessesByName(name);
+                if (processes.Length == 0) return;
+                
+                foreach (var p in processes) 
+                {
+                    try { if (!p.HasExited) p.Kill(); } catch { }
+                }
                 Thread.Sleep(200);
             }
         }
@@ -182,8 +254,8 @@ namespace LiteMonitor.Updater
         {
             try
             {
-                File.WriteAllText(Path.Combine(dir, "update_error.log"),
-                    DateTime.Now + "\n" + msg);
+                File.AppendAllText(Path.Combine(dir, "update_error.log"),
+                    DateTime.Now + " " + msg + Environment.NewLine);
             }
             catch { }
         }
