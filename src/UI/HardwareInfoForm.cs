@@ -22,7 +22,7 @@ namespace LiteMonitor.src.UI
 
         public HardwareInfoForm()
         {
-            this.Text = T("LiteMonitor - Hardware Info", "LiteMonitor - 硬件详细信息");
+            this.Text = T("LiteMonitor - Hardware Info", "LiteMonitor - 系统硬件详情");
             this.Size = new Size(UIUtils.S(600), UIUtils.S(750)); // 稍微加宽一点
             this.StartPosition = FormStartPosition.CenterScreen;
             this.BackColor = Color.White;
@@ -47,8 +47,8 @@ namespace LiteMonitor.src.UI
             _tree = new LiteTreeView { Dock = DockStyle.Fill };
             
             var cms = new ContextMenuStrip();
+            cms.Items.Add(T("Copy ID", "复制传感器ID"), null, (s, e) => CopyInfo("ID"));
             cms.Items.Add(T("Copy Value", "复制数值"), null, (s, e) => CopyInfo("Value"));
-            cms.Items.Add(T("Copy ID", "复制ID"), null, (s, e) => CopyInfo("ID"));
             cms.Items.Add(new ToolStripSeparator());
             cms.Items.Add(T("Expand All", "全部展开"), null, (s, e) => _tree.ExpandAll());
             // ★★★ 修改这里：去掉 foreach 循环，只保留 CollapseAll ★★★
@@ -116,12 +116,12 @@ namespace LiteMonitor.src.UI
             // 2. 绘制 "Sensor" (左侧)
             // 使用 Rectangle 而不是 Point，并垂直居中，防止位置跑偏
             Rectangle titleRect = new Rectangle(30, 0, xValueLeft - 10, _headerPanel.Height);
-            TextRenderer.DrawText(g, " " + T("Sensor", "硬件&传感器"), font, titleRect, Color.FromArgb(80, 80, 80), 
+            TextRenderer.DrawText(g, " " + T("Sensor", "硬件 > 传感器"), font, titleRect, Color.FromArgb(80, 80, 80), 
                 TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
 
             // 3. 绘制 "Max"
             Rectangle maxRect = new Rectangle(xMaxLeft, 0, colMaxW, _headerPanel.Height);
-            TextRenderer.DrawText(g, T("Max", "最大值"), font, maxRect, Color.FromArgb(80, 80, 80), 
+            TextRenderer.DrawText(g, T("Max", "最大记录"), font, maxRect, Color.FromArgb(80, 80, 80), 
                 TextFormatFlags.VerticalCenter | TextFormatFlags.Right | TextFormatFlags.SingleLine);
 
             // 4. 绘制 "Value"
@@ -145,14 +145,16 @@ namespace LiteMonitor.src.UI
                 return;
             }
 
+            bool isFirstHardware = true;
             foreach (var hw in computer.Hardware)
             {
-                AddHardwareNode(_tree.Nodes, hw, filter, !string.IsNullOrEmpty(filter));
+                AddHardwareNode(_tree.Nodes, hw, filter, !string.IsNullOrEmpty(filter), isFirstHardware && string.IsNullOrEmpty(filter));
+                isFirstHardware = false;
             }
             _tree.EndUpdate();
         }
 
-        private void AddHardwareNode(TreeNodeCollection parentNodes, IHardware hw, string filter, bool isSearch)
+        private void AddHardwareNode(TreeNodeCollection parentNodes, IHardware hw, string filter, bool isSearch, bool isFirstHardware)
         {
             string typeStr = GetHardwareTypeString(hw.HardwareType);
             string label = $"{typeStr} {hw.Name}";
@@ -180,14 +182,15 @@ namespace LiteMonitor.src.UI
                 if (groupHasMatch)
                 {
                     hwNode.Nodes.Add(typeNode);
-                    if (isSearch) typeNode.Expand(); 
+                    if (isSearch) typeNode.Expand(); // 只有搜索模式下才展开传感器类型分组
                     hasContent = true;
                 }
             }
 
             foreach (var subHw in hw.SubHardware)
             {
-                AddHardwareNode(hwNode.Nodes, subHw, filter, isSearch);
+                // 如果当前是第一个硬件节点，其子硬件也需要展开分组
+                AddHardwareNode(hwNode.Nodes, subHw, filter, isSearch, isFirstHardware);
             }
             if (hwNode.Nodes.Count > 0) hasContent = true;
 
@@ -202,11 +205,11 @@ namespace LiteMonitor.src.UI
                 }
                 else
                 {
-                    // 普通模式：只显示硬件层，且全部折叠 (用户要求 "默认全部折叠到只显示 最上层的")
-                    // 这里不调用 Expand()，默认就是 Collapse 的
-                    // 如果你想让硬件层可见但子项不展开，这样就已经做到了（因为添加到了 parentNodes）
-                    // 唯一需要做的是，如果 HardwareNode 是根节点，它默认就是显示的。
-                    // 不需要 Expand()。
+                    if (isFirstHardware)
+                    {
+                        hwNode.Expand(); // 第一个硬件节点展开，显示所有传感器分组
+                    }
+                    // 其他硬件节点保持折叠
                 }
             }
         }
@@ -247,13 +250,14 @@ namespace LiteMonitor.src.UI
         {
             switch (type) {
                 case SensorType.Temperature: return T("🌡️ [Temperature]", "🌡️ [温度]");
-                case SensorType.Load: return T("📊 [Load]", "📊 [负载]");
+                case SensorType.Load: return T("⌛ [Load]", "⌛ [负载]");
                 case SensorType.Fan: return T("🌪️ [Fan]", "🌪️ [风扇]");
                 case SensorType.Power: return T("⚡ [Power]", "⚡ [功耗]");
                 case SensorType.Clock: return T("⏱️ [Clock]", "⏱️ [频率]");
                 case SensorType.Control: return T("🎛️ [Control]", "🎛️ [控制]");
                 case SensorType.Voltage: return T("🔋 [Voltage]", "🔋 [电压]");
                 case SensorType.Data: return T("📈 [Data]", "📈 [数据]");
+                case SensorType.SmallData: return T("📶 [SmallData]", "📶 [小型数据]");
                 case SensorType.Throughput: return T("🚀 [Throughput]", "🚀 [吞吐量]");
                 default: return "🟢";
             }

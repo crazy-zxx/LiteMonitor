@@ -428,9 +428,9 @@ namespace LiteMonitor
             menu.Items.Add(new ToolStripSeparator());
 
 
-            // --- [新增代码开始] ---
+            // --- [系统硬件详情] ---
             var btnHardware = new ToolStripMenuItem(LanguageManager.T("Menu.HardwareInfo")); 
-            btnHardware.Image = null; // 或者找个图标
+            btnHardware.Image = Properties.Resources.HardwareInfo; // 或者找个图标
             btnHardware.Click += (s, e) => 
             {
                 // 这里的模式是：每次点击都 new 一个新的，关闭即销毁。
@@ -466,7 +466,7 @@ namespace LiteMonitor
                 formHistory.Show();
             };
             menu.Items.Add(trafficItem);
-
+            menu.Items.Add(new ToolStripSeparator());
              // =================================================================
             // [新增] 设置中心入口
             // =================================================================

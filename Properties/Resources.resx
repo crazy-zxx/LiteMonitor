@@ -121,6 +121,10 @@
   <data name="AppIcon" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\resources\assets\app.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="HardwareInfo" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\resources\assets\HardwareInfo.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+    <comment>HardwareInfo.png</comment>
+  </data>
   <data name="NetworkIcon" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\resources\assets\networkTest.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
     <comment>网络图标</comment>

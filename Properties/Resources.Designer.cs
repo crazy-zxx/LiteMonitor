@@ -73,6 +73,16 @@ namespace LiteMonitor.Properties {
         /// <summary>
         ///   查找 System.Drawing.Bitmap 类型的本地化资源。
         /// </summary>
+        internal static System.Drawing.Bitmap HardwareInfo {
+            get {
+                object obj = ResourceManager.GetObject("HardwareInfo", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
         internal static System.Drawing.Bitmap NetworkIcon {
             get {
                 object obj = ResourceManager.GetObject("NetworkIcon", resourceCulture);
