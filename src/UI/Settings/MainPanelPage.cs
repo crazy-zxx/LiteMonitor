@@ -1,8 +1,11 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Linq;
 using LiteMonitor.src.Core;
 using LiteMonitor.src.UI.Controls;
+using System.Diagnostics; // Process
+using LiteMonitor.src.SystemServices;
 
 namespace LiteMonitor.src.UI.SettingsPage
 {
@@ -42,7 +45,9 @@ namespace LiteMonitor.src.UI.SettingsPage
             _container.Controls.Clear();
 
             CreateBehaviorCard();
+            CreateWebCard(); // ★★★ 新增：网页显示分组 ★★★
             CreateAppearanceCard();
+            
 
             _container.ResumeLayout();
             _isLoaded = true;
@@ -129,6 +134,90 @@ namespace LiteMonitor.src.UI.SettingsPage
                 s => Config.UIScale = UIUtils.ParseDouble(s) / 100.0);
 
             group.AddFullItem(new LiteNote(LanguageManager.T("Menu.MemoryDisplayModeTip"), 0));
+
+            AddGroupToPage(group);
+        }
+
+        // ★★★ 新增：网页显示分组 ★★★
+        // ★★★ [修改] 网页显示分组：将按钮移至 Tips 右侧 ★★★
+        private void CreateWebCard()
+        {
+            // 1. 创建分组
+            // 注意：请确保你的语言文件里有 Menu.WebSettings 或 Menu.WebServer
+            var group = new LiteSettingsGroup(LanguageManager.T("Menu.WebServer")); 
+
+            // ==========================================================
+            // A. 构建头部区域 (Tips + 右侧按钮)
+            // ==========================================================
+            
+            // A1. 创建“打开网页”按钮
+            // 第二个参数 false 表示使用"灰色/次要"样式，类似监控项的按钮
+            var btnOpen = new LiteButton(LanguageManager.T("Menu.OpenWeb"), false); 
+            
+            // 调整尺寸：高度设为 24px (比默认略矮)，宽度适中
+            btnOpen.Size = new Size(UIUtils.S(80), UIUtils.S(24)); 
+            // 停靠在右侧
+            btnOpen.Dock = DockStyle.Right; 
+
+            // 按钮点击逻辑 (保持你的 IP 获取逻辑不变)
+            btnOpen.Click += (s, e) => 
+            {
+                try 
+                {
+                    string host = "localhost";
+                    // 尝试从 HardwareMonitor 获取真实 IP
+                    if (HardwareMonitor.Instance != null)
+                    {
+                        string ip = HardwareMonitor.Instance.GetNetworkIP();
+                        if (!string.IsNullOrEmpty(ip) && ip != "0.0.0.0" && ip != "127.0.0.1") 
+                        {
+                            host = ip;
+                        }
+                    }
+                    var url = $"http://{host}:{Config.WebServerPort}";
+                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                }
+                catch (Exception ex) { MessageBox.Show(ex.Message); }
+            };
+
+            // A2. 创建 Tips 文本
+            var note = new LiteNote(LanguageManager.T("Menu.WebServerTip"), 0);
+            note.Dock = DockStyle.Fill; // 填满左侧剩余空间
+
+            // A3. 创建容器 Panel
+            var headerPanel = new Panel {
+                Height = UIUtils.S(30), // 设置高度，足以容纳按钮和文字
+                Padding = new Padding(0) 
+            };
+
+            // ★★★ 布局关键：先添加 Fill 的，再添加 Right 的，但在 Z 轴上 Right 要优先 ★★★
+            // 为了保证 btnOpen 能够切掉右边的空间，我们需要正确处理
+            // 最稳妥的方法：
+            headerPanel.Controls.Add(btnOpen); // 先加按钮 (Dock=Right)
+            headerPanel.Controls.Add(note);    // 后加文字 (Dock=Fill)
+            // 调整 Z-Order 确保按钮不被遮挡 (将按钮置于顶层)
+            btnOpen.BringToFront(); 
+
+            // A4. 将这个组合面板作为 FullItem 加入分组
+            group.AddFullItem(headerPanel);
+
+
+            // ==========================================================
+            // B. 常规设置项
+            // ==========================================================
+
+            // 网页显示 开启
+            AddBool(group, "Menu.WebServer", 
+                () => Config.WebServerEnabled, 
+                v => Config.WebServerEnabled = v
+            );
+
+            // 端口 输入框
+            AddNumberInt(group, "Menu.WebServerPort", "", 
+                () => Config.WebServerPort, 
+                v => Config.WebServerPort = v,
+                60 // 宽度
+            );
 
             AddGroupToPage(group);
         }

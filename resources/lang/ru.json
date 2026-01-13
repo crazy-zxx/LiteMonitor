@@ -88,6 +88,10 @@
     "ActionTaskMgr": "Диспетчер",
     "ActionSettings": "Настройки",
     "ActionTrafficHistory": "История",
+    "WebServer": "Веб-интерфейс",
+    "WebServerPort": "Порт веб",
+    "OpenWeb": "Открыть веб",
+    "WebServerTip": "⚠️Включите для просмотра данных через 'IP:порт'.",
 
     "Appearance": "Внешний вид",
     "Theme": "Тема",

@@ -7,6 +7,7 @@ using LiteMonitor.src.SystemServices;
 using LiteMonitor.src.Core;
 using LiteMonitor.src.UI;
 using System.Collections.Generic;
+using System.Diagnostics; // 用于 Process.Start
 
 namespace LiteMonitor
 {
@@ -89,41 +90,71 @@ namespace LiteMonitor
             modeRoot.DropDownItems.Add(taskbarMode);
 
 
-            // === [新增] 网页显示选项 ===
-            var itemWeb = new ToolStripMenuItem(LanguageManager.T("Menu.WebDisplay")); // 需要去 en.json/zh.json 加这个 Key
-            itemWeb.CheckOnClick = true;
+            // =========================================================
+            // ★★★ [修改] 网页显示选项 (改为二级菜单结构) ★★★
+            // =========================================================
+            var itemWeb = new ToolStripMenuItem(LanguageManager.T("Menu.WebServer")); // 请确保语言包有 "Menu.WebServer"
             
-            // 初始化勾选状态：检查 Config 是否开启
-            itemWeb.Checked = cfg.WebServerEnabled;
-
-            itemWeb.Click += (s, e) => 
+            // 1. 子项：启用/禁用
+            var itemWebEnable = new ToolStripMenuItem(LanguageManager.T("Menu.Enable")) // 请确保语言包有 "Menu.WebServerEnabled"
             {
-                bool isEnabled = itemWeb.Checked;
-                cfg.WebServerEnabled = isEnabled;
-                cfg.Save(); // 保存设置
+                Checked = cfg.WebServerEnabled,
+                CheckOnClick = true
+            };
 
-                // 1. 启停服务
-                if (isEnabled)
+            // 2. 子项：打开网页 (动态获取 IP)
+            var itemWebOpen = new ToolStripMenuItem(LanguageManager.T("Menu.OpenWeb")); // 请确保语言包有 "Menu.OpenWeb"
+            itemWebOpen.Enabled = cfg.WebServerEnabled; // 只有开启时才可用
+
+            // 事件：切换开关
+            itemWebEnable.CheckedChanged += (s, e) => 
+            {
+                // 1. 更新配置
+                cfg.WebServerEnabled = itemWebEnable.Checked;
+                cfg.Save(); 
+
+                // 2. ★ 立即应用（调用 AppActions 重启服务）
+                AppActions.ApplyWebServer(cfg); 
+                
+                // 3. 刷新“打开网页”按钮的可用状态
+                itemWebOpen.Enabled = cfg.WebServerEnabled;
+            };
+
+            // 事件：打开网页
+            itemWebOpen.Click += (s, e) => 
+            {
+                try 
                 {
-                    LiteMonitor.src.WebServer.LiteWebServer.Instance?.Start();
-                    // 2. 弹窗询问是否打开浏览器
-                    if (MessageBox.Show("Web Server Started.\nOpen in browser now?", "Web Remote", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                    string host = "localhost";
+                    // ★★★ 核心修改：从 HardwareMonitor 获取真实 IP ★★★
+                    if (HardwareMonitor.Instance != null)
                     {
-                        string url = $"http://localhost:{cfg.WebServerPort}/";
-                        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); } catch {}
+                        string ip = HardwareMonitor.Instance.GetNetworkIP();
+                        // 过滤无效 IP (0.0.0.0 或 127.0.0.1 这种通常没有参考意义，虽然 127 能用但我们优先取局域网IP)
+                        if (!string.IsNullOrEmpty(ip) && ip != "0.0.0.0" && ip != "127.0.0.1") 
+                        {
+                            host = ip;
+                        }
                     }
+                    
+                    string url = $"http://{host}:{cfg.WebServerPort}/";
+                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
                 }
-                else
+                catch (Exception ex)
                 {
-                    LiteMonitor.src.WebServer.LiteWebServer.Instance?.Stop();
+                    MessageBox.Show("Open Failed: " + ex.Message);
                 }
             };
-            
-            // 将其添加到菜单合适的位置，比如放在“显示设置”下面
+
+            itemWeb.ToolTipText = LanguageManager.T("Menu.WebServerTip");
+            // 将子项加入父菜单
+            itemWeb.DropDownItems.Add(itemWebEnable);
+            itemWeb.DropDownItems.Add(itemWebOpen);
+            // 将父菜单加入“显示模式”组 (或者您可以根据喜好移到 menu.Items.Add(itemWeb) 放到外层)
             modeRoot.DropDownItems.Add(itemWeb);
-
+            
             modeRoot.DropDownItems.Add(new ToolStripSeparator());
-
+            // =========================================================
 
 
             // === 自动隐藏 ===

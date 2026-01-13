@@ -89,6 +89,10 @@
     "ActionTaskMgr": "Gestionnaire",
     "ActionSettings": "Options",
     "ActionTrafficHistory": "Historique",
+    "WebServer": "Affichage web",
+    "WebServerPort": "Port web",
+    "OpenWeb": "Ouvrir web",
+    "WebServerTip": "⚠️Activez pour consulter les données via 'IP:port'.",
 
     "Appearance": "Apparence",
     "Theme": "Thème",

@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using LiteMonitor.src.UI;
 using LiteMonitor.src.SystemServices;
+using LiteMonitor.src.WebServer; // ★★★ 引用 WebServer 命名空间 ★★★
 
 namespace LiteMonitor.src.Core
 {
@@ -33,7 +34,10 @@ namespace LiteMonitor.src.Core
             ApplyMonitorLayout(ui, mainForm); // 监控项、硬件源变更
             ApplyTaskbarStyle(cfg, ui);       // 任务栏样式
 
-            // 5. 可见性 (最后执行，避免闪烁)
+            // ★★★ 5. [新增] 应用网页服务设置 (重启服务以应用端口变更) ★★★
+            ApplyWebServer(cfg);
+
+            // 6. 可见性 (最后执行，避免闪烁)
             ApplyVisibility(cfg, mainForm);
         }
 
@@ -168,6 +172,27 @@ namespace LiteMonitor.src.Core
             
             // 如果样式影响了主程序计算（极少情况），可解开下面注释
             ui?.ApplyTheme(cfg.Skin); 
+        }
+
+        // =============================================================
+        // 7. 网页服务 (新增逻辑)
+        // =============================================================
+        public static void ApplyWebServer(Settings cfg)
+        {
+            var server = LiteWebServer.Instance;
+            if (server != null)
+            {
+                // 1. 无论端口是否变化，先强制停止 (释放旧端口)
+                // Stop 方法内部处理了 null 和异常，是安全的
+                server.Stop();
+                
+                // 2. 如果开关是开启的，则重新启动 
+                // (Start 方法内部会读取 cfg.WebServerPort 的最新值)
+                if (cfg.WebServerEnabled)
+                {
+                    server.Start();
+                }
+            }
         }
 
         // --- 内部辅助 ---

@@ -87,6 +87,10 @@
     "ActionTaskMgr": "開啟工作管理員",
     "ActionSettings": "開啟設定面板",
     "ActionTrafficHistory": "開啟歷史流量統計",
+    "WebServer": "網頁顯示",
+    "WebServerPort": "網頁連接埠",
+    "OpenWeb": "開啟網頁",
+    "WebServerTip": "⚠️開啟後，可透過「內網IP:連接埠」查看監控數據。",
 
     "Appearance": "外觀設定",
     "Theme": "主題",

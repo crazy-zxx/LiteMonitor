@@ -88,6 +88,10 @@
     "ActionTaskMgr": "Administrador",
     "ActionSettings": "Ajustes",
     "ActionTrafficHistory": "Historial datos",
+    "WebServer": "Mostrar web",
+    "WebServerPort": "Puerto web",
+    "OpenWeb": "Abrir web",
+    "WebServerTip": "⚠️Activa para consultar datos a través de 'IP:puertos'.",
 
     "Appearance": "Apariencia",
     "Theme": "Tema",

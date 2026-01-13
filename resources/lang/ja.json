@@ -89,6 +89,10 @@
     "ActionTaskMgr": "タスクマネージャー",
     "ActionSettings": "設定パネル",
     "ActionTrafficHistory": "通信量履歴",
+    "WebServer": "ウェブ表示",
+    "WebServerPort": "ウェブポート",
+    "OpenWeb": "ウェブを開く",
+    "WebServerTip": "⚠️有効にすると「ローカルIP:ポート」で監視データを確認できます。",
 
     "Appearance": "外観設定",
     "Theme": "テーマ",

@@ -87,7 +87,11 @@
     "ActionTaskMgr": "打开任务管理器",
     "ActionSettings": "打开设置面板",
     "ActionTrafficHistory": "打开历史流量统计",
-    "WebDisplay": "网页监控 (Web Remote)",
+    "WebServer": "网页版显示",
+    "WebServerPort": "网页端口",
+    "OpenWeb": "打开网页",
+    "WebServerTip": "⚠️说明：开启网页版显示后，手机和电脑可通过“内网IP:端口”打开网页查看监控数据。",
+
     "Appearance": "外观设置",
     "Theme": "主题",
     "DisplayMode": "显示模式",

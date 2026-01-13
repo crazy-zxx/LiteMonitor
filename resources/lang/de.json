@@ -88,6 +88,10 @@
     "ActionTaskMgr": "Task-Manager",
     "ActionSettings": "Einstellungen",
     "ActionTrafficHistory": "Datenverlauf",
+    "WebServer": "Web-Anzeige",
+    "WebServerPort": "Web-Port",
+    "OpenWeb": "Web öffnen",
+    "WebServerTip": "⚠️Aktivieren Sie, um Daten über 'IP:Port' abzurufen.",
 
     "Appearance": "Design",
     "Theme": "Thema",
