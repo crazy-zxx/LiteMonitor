@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using LibreHardwareMonitor.Hardware;
 using LiteMonitor.src.Core;
 using Debug = System.Diagnostics.Debug;
@@ -29,6 +30,8 @@ namespace LiteMonitor.src.SystemServices
         private IHardware? _cachedNetHw;
         private DateTime _lastNetScan = DateTime.MinValue;
         private readonly DateTime _startTime = DateTime.Now; // 启动时间
+        private static string _staticIPCache = "";// [修改] 增加IP静态缓存，切换主题/重启服务时不丢失，解决闪烁问题
+        private static DateTime _lastIPCheckTime = DateTime.MinValue; // 上次检查IP的时间
 
         public void ClearCache()
         {
@@ -60,6 +63,45 @@ namespace LiteMonitor.src.SystemServices
             {
                 hw.Update();
             }
+        }
+
+        // [新增] 获取当前 IP (带 10秒 缓存)
+        public string GetCurrentIP()
+        {
+            // 1. 缓存保护：只有当缓存了【有效IP】且距离上次检查不到 30 秒时，才直接返回
+            // 关键修改：如果 _staticIPCache 是空的，忽略时间限制，强制重试
+            if (!string.IsNullOrEmpty(_staticIPCache) && (DateTime.Now - _lastIPCheckTime).TotalSeconds < 30)
+            {
+                return _staticIPCache;
+            }
+
+            try 
+            {
+                // 2. 直接从当前锁定的硬件中获取 (这是最直接的方式，和你读取网卡流量是同一个源)
+                if (_cachedNetHw != null && _netStates.TryGetValue(_cachedNetHw, out var state))
+                {
+                    if (state.NativeAdapter != null)
+                    {
+                        var props = state.NativeAdapter.GetIPProperties();
+                        foreach (var ip in props.UnicastAddresses)
+                        {
+                            if (ip.Address.AddressFamily == AddressFamily.InterNetwork)
+                            {
+                                string newIP = ip.Address.ToString();
+                                
+                                // 只有拿到了真正的 IP，才更新缓存和时间
+                                _staticIPCache = newIP;
+                                _lastIPCheckTime = DateTime.Now; 
+                                return newIP;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            
+            // 如果没拿到，返回旧缓存（如果是空的，下一秒会继续尝试，不再傻等30秒）
+            return _staticIPCache; 
         }
 
         // ===========================================================

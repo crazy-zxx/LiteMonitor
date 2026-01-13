@@ -49,6 +49,8 @@ namespace LiteMonitor.src.SystemServices
         [DllImport("psapi.dll")]
         private static extern int EmptyWorkingSet(IntPtr hwProc);
 
+        public string GetNetworkIP() => _networkManager.GetCurrentIP();
+
         public HardwareMonitor(Settings cfg)
         {
             _cfg = cfg;

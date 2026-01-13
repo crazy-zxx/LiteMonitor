@@ -8,7 +8,8 @@ namespace LiteMonitor
     public enum MetricRenderStyle
     {
         StandardBar, // 标准：左标签 + 右数值 + 底部进度条 (CPU/MEM/GPU)
-        TwoColumn    // 双列：居中标签 + 居中数值 (NET/DISK)
+        TwoColumn,   // 双列：居中标签 + 居中数值 (NET/DISK)
+        TextOnly     // [新增] 纯文本模式：左标签 + 右文本 (无进度条，用于 NET.IP)
     }
 
     public class MetricItem
@@ -40,6 +41,9 @@ namespace LiteMonitor
         public float? Value { get; set; } = null;
         public float DisplayValue { get; set; } = 0f;
 
+        // [新增] 文本值覆盖 (用于 IP 显示)
+        public string TextValue { get; set; } = null;
+
         // =============================
         // [保留优化] 缓存字段
         // =============================
@@ -62,6 +66,9 @@ namespace LiteMonitor
         /// <param name="isHorizontal">是否为横屏/任务栏模式（需要极简格式）</param>
         public string GetFormattedText(bool isHorizontal)
         {
+            // [新增] 如果有强制文本值，直接返回 (支持 IP 显示)
+            if (TextValue != null) return TextValue;
+
             // 仅在数值变化时触发 (Tick 级更新)
             if (Math.Abs(DisplayValue - _cachedDisplayValue) > 0.05f)
             {

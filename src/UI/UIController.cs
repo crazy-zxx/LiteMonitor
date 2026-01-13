@@ -19,6 +19,9 @@ namespace LiteMonitor
         private bool _layoutDirty = true;
         private bool _dragging = false;
 
+        // [新增] 缓存上一次的 IP，避免重复刷新 UI
+        private string _lastIP = "init";
+
         private List<GroupLayoutInfo> _groups = new();
         private List<Column> _hxColsHorizontal = new();
         private List<Column> _hxColsTaskbar = new();
@@ -158,7 +161,42 @@ namespace LiteMonitor
             {
                 await System.Threading.Tasks.Task.Run(() => _mon.UpdateAll());
 
-                // ① 更新竖屏用的 items
+                // ======================================================
+                // [优化] 只有当 IP 开启显示时，才去获取 IP
+                // ======================================================
+                bool showIpPanel = _cfg.MonitorItems.Any(x => x.Key == "NET.IP" && x.VisibleInPanel);
+                bool showIpTaskbar = _cfg.MonitorItems.Any(x => x.Key == "NET.IP" && x.VisibleInTaskbar);
+                
+                string currentIP = "";
+                
+                // 如果任意一处需要显示 IP，才调用底层的 GetNetworkIP (底层已有缓存，性能无忧)
+                if (showIpPanel || showIpTaskbar)
+                {
+                    currentIP = _mon.GetNetworkIP();
+
+                    // 检测 IP 变化 (仅在变化时触发重排)
+                    if (currentIP != _lastIP)
+                    {
+                        _lastIP = currentIP;
+                        
+                        // 1. 更新竖屏标题 (仅当面板显示开启时)
+                        if (showIpPanel)
+                        {
+                            var netGroup = _groups.FirstOrDefault(g => g.GroupName == "NET" || g.GroupName == "DATA");
+                            if (netGroup != null)
+                            {
+                                string baseTitle = LanguageManager.T(UIUtils.Intern("Groups." + netGroup.GroupName));
+                                netGroup.Label = !string.IsNullOrEmpty(currentIP) ? $"{baseTitle}  {currentIP}" : baseTitle;
+                            }
+                        }
+
+                        // 2. 标记重排 (横屏/任务栏列宽需要重算)
+                        _layoutDirty = true; 
+                    }
+                }
+                // ======================================================
+
+                // ① 更新竖屏 items
                 foreach (var g in _groups)
                     foreach (var it in g.Items)
                     {
@@ -166,20 +204,27 @@ namespace LiteMonitor
                         it.TickSmooth(_cfg.AnimationSpeed);
                     }
 
-                // ② 同步更新横版 / 任务栏用的列数据
+                // ② 更新横版 / 任务栏 (清理了冗余代码)
                 void UpdateCol(Column col)
                 {
-                    if (col.Top != null)
+                    void UpdateItem(MetricItem it) 
                     {
-                        col.Top.Value = _mon.Get(col.Top.Key);
-                        col.Top.TickSmooth(_cfg.AnimationSpeed);
+                        if (it == null) return;
+                        if (it.Key == "NET.IP") 
+                        {
+                            // 只有显示开启时才赋值，否则为空
+                            it.TextValue = currentIP; 
+                        }
+                        else 
+                        {
+                            it.Value = _mon.Get(it.Key);
+                            it.TickSmooth(_cfg.AnimationSpeed);
+                        }
                     }
-                    if (col.Bottom != null)
-                    {
-                        col.Bottom.Value = _mon.Get(col.Bottom.Key);
-                        col.Bottom.TickSmooth(_cfg.AnimationSpeed);
-                    }
+                    UpdateItem(col.Top);
+                    UpdateItem(col.Bottom);
                 }
+                
                 foreach (var col in _hxColsHorizontal) UpdateCol(col);
                 foreach (var col in _hxColsTaskbar) UpdateCol(col);
  
@@ -203,37 +248,46 @@ namespace LiteMonitor
 
             if (activeItems.Count == 0) return;
 
+            // [新增] 预先获取 IP 状态
+            bool showIp = _cfg.MonitorItems.Any(x => x.Key == "NET.IP" && x.VisibleInPanel);
+            string ipSuffix = showIp ? _mon.GetNetworkIP() : "";
+
             string currentGroupKey = "";
             List<MetricItem> currentGroupList = new List<MetricItem>();
 
             foreach (var cfgItem in activeItems)
             {
+                // [新增] ★★★ 拦截 NET.IP ★★★
+                // 竖屏模式下，不创建 IP 的实体 Item，只把它作为标题后缀
+                if (cfgItem.Key == "NET.IP") continue;
+
                 string groupKey = cfgItem.UIGroup;
 
                 if (groupKey != currentGroupKey && currentGroupList.Count > 0)
                 {
                     var gr = new GroupLayoutInfo(currentGroupKey, currentGroupList);
-                    // ★★★ 填充组标签缓存 ★★★
-                    // ★★★ 优化：Intern 动态生成的 Key，解决 Groups.HOST 重复问题 ★★★
                     string gName = LanguageManager.T(UIUtils.Intern("Groups." + currentGroupKey));
                     if (_cfg.GroupAliases.ContainsKey(currentGroupKey)) gName = _cfg.GroupAliases[currentGroupKey];
-                    gr.Label = gName;
                     
+                    // [新增] 动态拼接 IP 到上一组的标题 (如果是 NET 组)
+                    if ((currentGroupKey == "NET") && !string.IsNullOrEmpty(ipSuffix))
+                    {
+                        gName += $" {ipSuffix}";
+                    }
+
+                    gr.Label = gName;
                     _groups.Add(gr);
                     currentGroupList = new List<MetricItem>();
                 }
 
                 currentGroupKey = groupKey;
 
-                // ★★★ 优化：Intern 动态生成的 Key，解决 Items.CPU.Load 重复问题 ★★★
                 string label = LanguageManager.T(UIUtils.Intern("Items." + cfgItem.Key));
                 var item = new MetricItem 
                 { 
                     Key = cfgItem.Key, 
                     Label = label 
                 };
-                // ★★★ 补充 ShortLabel (虽然竖屏不用，但保持一致性也好) ★★★
-                // ★★★ 优化：Intern 动态生成的 Key，解决 Short.CPU.Load 重复问题 ★★★
                 item.ShortLabel = LanguageManager.T(UIUtils.Intern("Short." + cfgItem.Key));
                 
                 float? val = _mon.Get(item.Key);
@@ -246,10 +300,15 @@ namespace LiteMonitor
             if (currentGroupList.Count > 0)
             {
                 var gr = new GroupLayoutInfo(currentGroupKey, currentGroupList);
-                // ★★★ 填充最后那一组的标签 ★★★
-                // ★★★ 优化：Intern 动态生成的 Key ★★★
                 string gName = LanguageManager.T(UIUtils.Intern("Groups." + currentGroupKey));
                  if (_cfg.GroupAliases.ContainsKey(currentGroupKey)) gName = _cfg.GroupAliases[currentGroupKey];
+                
+                // [新增] 同样处理最后一组
+                if ((currentGroupKey == "NET") && !string.IsNullOrEmpty(ipSuffix))
+                {
+                    gName += $" {ipSuffix}";
+                }
+
                 gr.Label = gName;
                 _groups.Add(gr);
             }
@@ -265,31 +324,39 @@ namespace LiteMonitor
         {
             var cols = new List<Column>();
 
+            // 1. 筛选
             var query = _cfg.MonitorItems
                 .Where(x => forTaskbar ? x.VisibleInTaskbar : x.VisibleInPanel);
 
+            // 2. 排序
             if (forTaskbar || _cfg.HorizontalFollowsTaskbar)
-            {
                 query = query.OrderBy(x => x.TaskbarSortIndex);
-            }
             else
-            {
                 query = query.OrderBy(x => x.SortIndex);
-            }
 
             var items = query.ToList();
+            var validItems = new List<MonitorItemConfig>();
+
+            // [新增] 二次过滤：横条模式不显示 IP
+            foreach (var item in items)
+            {
+                // 如果不是任务栏模式（即横屏桌面模式），且是 IP，则跳过
+                if (!forTaskbar && item.Key == "NET.IP") continue;
+                
+                validItems.Add(item);
+            }
 
             bool singleLine = forTaskbar && _cfg.TaskbarSingleLine;
             int step = singleLine ? 1 : 2;
 
-            for (int i = 0; i < items.Count; i += step)
+            for (int i = 0; i < validItems.Count; i += step)
             {
                 var col = new Column();
-                col.Top = CreateMetric(items[i]);
+                col.Top = CreateMetric(validItems[i]);
 
-                if (!singleLine && i + 1 < items.Count)
+                if (!singleLine && i + 1 < validItems.Count)
                 {
-                    col.Bottom = CreateMetric(items[i + 1]);
+                    col.Bottom = CreateMetric(validItems[i + 1]);
                 }
                 cols.Add(col);
             }
@@ -303,12 +370,23 @@ namespace LiteMonitor
             { 
                 Key = cfg.Key 
             };
-            // ★★★ 核心修复：在这里填充 Label 和 ShortLabel，避免 HorizontalRenderer 每帧去查字典 ★★★
-            // ★★★ 优化：Intern 动态生成的 Key，解决 Short.CPU.Temp 重复问题 ★★★
-            item.Label = LanguageManager.T(UIUtils.Intern("Items." + cfg.Key));
-            item.ShortLabel = LanguageManager.T(UIUtils.Intern("Short." + cfg.Key));
             
-            InitMetricValue(item);
+            // [新增] 针对 NET.IP 特殊处理
+            if (cfg.Key == "NET.IP")
+            {
+                item.Label = " ";      // 抹除长标签
+                item.ShortLabel = " "; // 抹除短标签
+                // 立即填充值，防止刚启动时为空
+                item.TextValue = _mon.GetNetworkIP(); 
+                item.Style = MetricRenderStyle.TextOnly;
+            }
+            else
+            {
+                item.Label = LanguageManager.T(UIUtils.Intern("Items." + cfg.Key));
+                item.ShortLabel = LanguageManager.T(UIUtils.Intern("Short." + cfg.Key));
+                InitMetricValue(item);
+            }
+            
             return item;
         }
 

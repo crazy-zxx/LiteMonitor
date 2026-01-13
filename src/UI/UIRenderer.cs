@@ -40,6 +40,8 @@ namespace LiteMonitor
                 {
                     if (it.Style == MetricRenderStyle.TwoColumn)
                         DrawTwoColumnItem(g, it, t);
+                    else if (it.Style == MetricRenderStyle.TextOnly) // [新增]
+                        DrawTextItem(g, it, t);
                     else
                         DrawStandardItem(g, it, t);
                 }
@@ -140,5 +142,30 @@ namespace LiteMonitor
                 valColor,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.Bottom | TextFormatFlags.NoPadding);
         }
+
+        // [新增] 绘制纯文本项方法
+        private static void DrawTextItem(Graphics g, MetricItem it, Theme t)
+        {
+            if (it.Bounds == Rectangle.Empty) return;
+
+            // 1. 绘制左侧标签 (IP)
+            string label = string.IsNullOrEmpty(it.Label) ? it.Key : it.Label;
+            TextRenderer.DrawText(g, label, t.FontItem, it.LabelRect,
+                ThemeManager.ParseColor(t.Color.TextPrimary),
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+
+            // 2. 绘制右侧数值 (192.168.x.x)
+            // 利用 Bounds 的宽度，或者借用进度条的位置来显示长文本
+            // 这里我们直接用整个行宽的右侧区域
+            var valueRect = new Rectangle(it.ValueRect.X, it.Bounds.Y, it.Bounds.Width - 10, it.Bounds.Height);
+
+            // 优先读取 TextValue
+            string text = it.TextValue ?? "";
+            
+            TextRenderer.DrawText(g, text, t.FontValue, valueRect,
+                ThemeManager.ParseColor(t.Color.ValueSafe), // 或者用 TextPrimary
+                TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+        }
+
     }
 }

@@ -59,103 +59,108 @@ namespace LiteMonitor
         public int Build(List<Column> cols, int taskbarHeight = 32)
         {
             if (cols == null || cols.Count == 0) return 0;
-            // ★ 1. 获取统一样式（不管是自定义还是默认，都由它决定）
+            
             var s = _settings.GetStyle();
-
             int pad = _padding;
             int padV = _padding / 2;
-
-            // ★ 定义单行模式变量
             bool isTaskbarSingle = (_mode == LayoutMode.Taskbar && _settings.TaskbarSingleLine);
 
             if (_mode == LayoutMode.Taskbar)
             {
-                // 任务栏上下没有额外 padding
                 padV = 0;
-
-                // ★ 如果是单行模式，行高=全高；否则=半高
                 _rowH = isTaskbarSingle ? taskbarHeight : taskbarHeight / 2;
             }
 
-            // ==== 宽度初始值 ====
             int totalWidth = pad * 2;
-
             float dpi = _dpiScale;
 
             using (var g = Graphics.FromHwnd(IntPtr.Zero))
             {
                 foreach (var col in cols)
                 {
-                    // ===== label（Top/Bottom 按最大宽度） =====
-                    // ★★★ 修复：使用MetricItem中已经缓存的ShortLabel，避免重复创建字符串 ★★★
-                    string labelTop = col.Top != null ? col.Top.ShortLabel : "";
-                    string labelBottom = col.Bottom != null ? col.Bottom.ShortLabel : "";
+                    // 分别计算 Top 和 Bottom 的所需宽度，然后取最大值
+                    int widthTop = 0;
+                    int widthBottom = 0;
 
-                    Font labelFont, valueFont;
-
-                    if (_mode == LayoutMode.Taskbar)
+                    // 定义一个局部函数来测量单个 Item 的宽度
+                    int MeasureItem(MetricItem item, bool isTop)
                     {
-                        var fs = s.Bold ? FontStyle.Bold : FontStyle.Regular;
-                        var f = new Font(s.Font, s.Size, fs); // 直接用 s.Font, s.Size
-                        labelFont = f; valueFont = f;
+                        if (item == null) return 0;
+
+                        // [特殊逻辑] 如果是 IP，按纯文本计算
+                        if (item.Key == "NET.IP")
+                        {
+                            string valText = item.TextValue;
+                            if (string.IsNullOrEmpty(valText)) valText = "0.0.0.0"; // 最小占位
+
+                            Font valFont = (_mode == LayoutMode.Taskbar) 
+                                ? new Font(s.Font, s.Size, s.Bold ? FontStyle.Bold : FontStyle.Regular) 
+                                : _t.FontValue;
+
+                            int w = TextRenderer.MeasureText(g, valText, valFont,
+                                new Size(int.MaxValue, int.MaxValue),
+                                TextFormatFlags.NoPadding).Width;
+
+                            if (_mode == LayoutMode.Taskbar) valFont.Dispose();
+                            return w; // IP 不需要额外 padding，直接返回文本宽
+                        }
+                        else
+                        {
+                            // [普通逻辑] 标签 + 数值 + 间距
+                            // 1. Label
+                            string label = item.ShortLabel;
+                            Font labelFont, valueFont;
+                            if (_mode == LayoutMode.Taskbar)
+                            {
+                                var fs = s.Bold ? FontStyle.Bold : FontStyle.Regular;
+                                var f = new Font(s.Font, s.Size, fs);
+                                labelFont = f; valueFont = f;
+                            }
+                            else
+                            {
+                                labelFont = _t.FontItem;
+                                valueFont = _t.FontValue;
+                            }
+                            
+                            int wLabel = TextRenderer.MeasureText(g, label, labelFont, 
+                                new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width;
+
+                            // 2. Value (使用样本值估算)
+                            string sample = GetMaxValueSample(col, isTop); // 注意：这里样本可能不准，但普通项差异不大
+                            int wValue = TextRenderer.MeasureText(g, sample, valueFont, 
+                                new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width;
+
+                            // 3. Padding
+                            int paddingX = _rowH;
+                            if (_mode == LayoutMode.Taskbar) paddingX = (int)Math.Round(s.Inner * dpi);
+
+                            if (_mode == LayoutMode.Taskbar)
+                            {
+                                labelFont.Dispose();
+                                valueFont.Dispose();
+                            }
+
+                            return wLabel + wValue + paddingX;
+                        }
                     }
-                    else
-                    {
-                        labelFont = _t.FontItem;
-                        valueFont = _t.FontValue;
-                    }
 
-                    int wLabelTop = TextRenderer.MeasureText(
-                        g, labelTop, labelFont,
-                        new Size(int.MaxValue, int.MaxValue),
-                        TextFormatFlags.NoPadding
-                    ).Width;
+                    // 执行测量
+                    widthTop = MeasureItem(col.Top, true);
+                    widthBottom = MeasureItem(col.Bottom, false);
 
-                    int wLabelBottom = TextRenderer.MeasureText(
-                        g, labelBottom, labelFont,
-                        new Size(int.MaxValue, int.MaxValue),
-                        TextFormatFlags.NoPadding
-                    ).Width;
-
-                    int wLabel = Math.Max(wLabelTop, wLabelBottom);
-
-                    // ========== value 最大宽度 ==========
-                    string sampleTop = GetMaxValueSample(col, true);
-                    string sampleBottom = GetMaxValueSample(col, false);
-
-                    int wValueTop = TextRenderer.MeasureText(
-                        g, sampleTop, valueFont,
-                        new Size(int.MaxValue, int.MaxValue),
-                        TextFormatFlags.NoPadding
-                    ).Width;
-
-                    int wValueBottom = TextRenderer.MeasureText(
-                        g, sampleBottom, valueFont,
-                        new Size(int.MaxValue, int.MaxValue),
-                        TextFormatFlags.NoPadding
-                    ).Width;
-
-                    int wValue = Math.Max(wValueTop, wValueBottom);
-                    // ★ 3. 替换内间距逻辑
-                    int paddingX = _rowH;
-                    if (_mode == LayoutMode.Taskbar) paddingX = (int)Math.Round(s.Inner * dpi); // 直接用 s.Inner
-
-                    // ====== 列宽（不再限制最大/最小宽度）======
-                    col.ColumnWidth = wLabel + wValue + paddingX;
+                    // ★★★ 核心修复：列宽取上下两者的最大值 ★★★
+                    // 这样即使 IP 在下面，列宽也会被 IP 撑大；
+                    // 同时上面的普通项也能利用这个宽度正常显示（虽然左右会有空余，但不会重叠）
+                    col.ColumnWidth = Math.Max(widthTop, widthBottom);
+                    
                     totalWidth += col.ColumnWidth;
-
-                    if (_mode == LayoutMode.Taskbar)
-                    {
-                        labelFont.Dispose();
-                        valueFont.Dispose();
-                    }
                 }
             }
 
-           
-           // ★ 4. 替换组间距逻辑
-            int gapBase = (_mode == LayoutMode.Taskbar) ? s.Gap : 12; // 直接用 s.Gap
-            int gap = (int)Math.Round(gapBase * dpi); // ===== gap 随 DPI =====
+
+             // 组间距逻辑
+            int gapBase = (_mode == LayoutMode.Taskbar) ? s.Gap : 12; 
+            int gap = (int)Math.Round(gapBase * dpi); 
 
             if (cols.Count > 1) totalWidth += (cols.Count - 1) * gap;
             PanelWidth = totalWidth;
@@ -165,35 +170,37 @@ namespace LiteMonitor
 
             foreach (var col in cols)
             {
-                // ★ 整个列的高度
                 int colHeight = isTaskbarSingle ? _rowH : _rowH * 2;
                 col.Bounds = new Rectangle(x, padV, col.ColumnWidth, colHeight);
 
                 if (_mode == LayoutMode.Taskbar)
                 {
-                   // ★ 5. 垂直定位逻辑（包含 offset 修正）
-                    int fixOffset = 1; // 全局向下微调 1px 防止偏上
+                    int fixOffset = 1; 
                     
                     if (isTaskbarSingle) {
                         col.BoundsTop = new Rectangle(x, col.Bounds.Y + fixOffset, col.ColumnWidth, colHeight);
                         col.BoundsBottom = Rectangle.Empty;
                     } else {
-                        // 双行模式：直接用 s.VOff
+                        // 双行模式
                         col.BoundsTop = new Rectangle(x, col.Bounds.Y + s.VOff + fixOffset, col.ColumnWidth, _rowH - s.VOff);
                         col.BoundsBottom = new Rectangle(x, col.Bounds.Y + _rowH - s.VOff + fixOffset, col.ColumnWidth, _rowH);
                     }
                 }
                 else
                 {
-                    // 横屏模式 (保持不变)
+                    // 横屏模式
                     col.BoundsTop = new Rectangle(col.Bounds.X, col.Bounds.Y, col.Bounds.Width, _rowH);
                     col.BoundsBottom = new Rectangle(col.Bounds.X, col.Bounds.Y + _rowH, col.Bounds.Width, _rowH);
                 }
+                
+                // [补充修正] 如果是 NET.IP 混合列，我们需要告诉 Renderer 不要画 Label 区域，而是全宽显示
+                // 但由于 Renderer 是根据 (LabelRect, ValueRect) 绘图的，而 HorizontalLayout 不负责计算具体的 LabelRect
+                // 所以我们依赖 TaskbarRenderer 的逻辑：它会看 Label 是否为空。
+                // 只要列宽足够（ColumnWidth 够大），TaskbarRenderer 右对齐 Value 时就不会出问题。
 
                 x += col.ColumnWidth + gap;
             }
 
-            // ★ 返回总高度
             return padV * 2 + (isTaskbarSingle ? _rowH : _rowH * 2);
         }
 

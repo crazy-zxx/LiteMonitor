@@ -26,6 +26,12 @@ namespace LiteMonitor
         private static void DrawColumn(Graphics g, Column col, Theme t)
         {
             if (col.Bounds == Rectangle.Empty) return;
+            // ★★★ [新增]：如果只有 Top 没有 Bottom，则让 Top 占用整个 Bounds (实现垂直居中)
+            if (col.Bottom == null && col.Top != null)
+            {
+                DrawItem(g, col.Top, col.Bounds, t);
+                return;
+            }
 
             int half = col.Bounds.Height / 2;
             var rectTop = new Rectangle(col.Bounds.X, col.Bounds.Y, col.Bounds.Width, half);

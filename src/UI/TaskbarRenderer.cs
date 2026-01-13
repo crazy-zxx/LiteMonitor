@@ -72,6 +72,13 @@ namespace LiteMonitor
 
             foreach (var col in cols)
             {
+                // ★★★ [新增]：如果只有 Top 没有 Bottom，强制使用全高绘制（居中）
+                if (col.Top != null && col.Bottom == null && col.Bounds != Rectangle.Empty)
+                {
+                    DrawItem(g, col.Top, col.Bounds, light);
+                    continue; // 处理完这个特殊情况直接跳过本次循环
+                }
+
                 if (col.BoundsTop != Rectangle.Empty && col.Top != null)
                     DrawItem(g, col.Top, col.BoundsTop, light);
 

@@ -457,6 +457,8 @@ namespace LiteMonitor
 
                 new MonitorItemConfig { Key = "NET.Up",    SortIndex = 40, VisibleInPanel = true, VisibleInTaskbar = true },
                 new MonitorItemConfig { Key = "NET.Down",  SortIndex = 41, VisibleInPanel = true, VisibleInTaskbar = true },
+                new MonitorItemConfig { Key = "NET.IP", SortIndex = 100, TaskbarSortIndex = 100, VisibleInPanel = true, VisibleInTaskbar = false, UserLabel = "IP",TaskbarLabel = "IP" },
+
                 new MonitorItemConfig { Key = "DATA.DayUp",  SortIndex = 50, VisibleInPanel = true },
                 new MonitorItemConfig { Key = "DATA.DayDown",SortIndex = 51, VisibleInPanel = true },
             };
