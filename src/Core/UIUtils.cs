@@ -114,15 +114,15 @@ namespace LiteMonitor.src.Core
         /// <summary>
         /// 获取最终显示的单位字符串
         /// </summary>
-        /// <param name="key">监控项Key</param>
-        /// <param name="calculatedUnit">系统计算出的动态单位(如 MB, RPM)</param>
-        /// <param name="userFormat">用户配置的格式字符串</param>
         public static string GetDisplayUnit(string key, string calculatedUnit, string userFormat)
         {
-            // 1. Auto 模式 (null 或 "Auto") -> 使用系统默认逻辑
-            if (string.IsNullOrEmpty(userFormat) || userFormat.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+            // ★★★ 修复：只判断 null 或 "Auto"，不要使用 IsNullOrEmpty (因为它包含 "") ★★★
+            // 如果 userFormat 是 null，代表用户没设置 -> Auto
+            // 如果 userFormat 是 ""，代表用户想隐藏 -> Hide (不进这个if)
+            if (userFormat == null || userFormat.Equals("Auto", StringComparison.OrdinalIgnoreCase))
             {
                 // 默认给速率类添加 /s
+                // GetDefaultUnit 也可以在这里复用，但为了性能保持原样或直接写死
                 if (key.StartsWith("NET") || key.StartsWith("DISK")) return calculatedUnit + "/s";
                 return calculatedUnit;
             }
@@ -136,7 +136,7 @@ namespace LiteMonitor.src.Core
                 return userFormat.Replace("{u}", calculatedUnit);
             }
 
-            // 4. Static 模式 (用户写死，如 "Hz")
+            // 4. Static 模式
             return userFormat;
         }
 
@@ -169,7 +169,7 @@ namespace LiteMonitor.src.Core
                 return ($"{v:0.0}", "%");
             }
 
-            if (key == "FPS") return ($"{v:0}", "FPS");
+            if (key == "FPS") return ($"{v:0}", " FPS");
 
             // 2. 百分比
             if (key.IndexOf("LOAD", StringComparison.OrdinalIgnoreCase) >= 0) return ($"{v:0.0}", "%");
@@ -179,7 +179,7 @@ namespace LiteMonitor.src.Core
 
             // 4. 风扇
             if (key.IndexOf("FAN", StringComparison.OrdinalIgnoreCase) >= 0 || 
-                key.IndexOf("PUMP", StringComparison.OrdinalIgnoreCase) >= 0) return ($"{v:0}", "RPM");
+                key.IndexOf("PUMP", StringComparison.OrdinalIgnoreCase) >= 0) return ($"{v:0}", " RPM");
 
             // 5. 频率
             if (key.IndexOf("CLOCK", StringComparison.OrdinalIgnoreCase) >= 0) return ($"{v / 1000.0:F1}", "GHz");
@@ -231,7 +231,7 @@ namespace LiteMonitor.src.Core
         public static string GetDefaultUnit(string key, bool isTaskbar)
         {
             // 1. 速率类：主界面带 /s，任务栏默认省空间不带
-            if (key.StartsWith("NET") || (key.StartsWith("DISK") && !key.StartsWith("TEMP"))) 
+            if (key.StartsWith("NET") || (key.StartsWith("DISK") && !key.StartsWith("Temp"))) 
                 return isTaskbar ? "{u}" : "{u}/s";
             
             // 2. 数据总量
@@ -249,10 +249,10 @@ namespace LiteMonitor.src.Core
             if (key.IndexOf("LOAD", StringComparison.OrdinalIgnoreCase) >= 0) return "%";
             if (key.IndexOf("TEMP", StringComparison.OrdinalIgnoreCase) >= 0) return "°C";
             if (key.IndexOf("FAN", StringComparison.OrdinalIgnoreCase) >= 0 || 
-                key.IndexOf("PUMP", StringComparison.OrdinalIgnoreCase) >= 0) return isTaskbar ? "R" : "RPM";
+                key.IndexOf("PUMP", StringComparison.OrdinalIgnoreCase) >= 0) return isTaskbar ? "R" : " RPM";
             if (key.IndexOf("CLOCK", StringComparison.OrdinalIgnoreCase) >= 0) return "GHz";
             if (key.IndexOf("POWER", StringComparison.OrdinalIgnoreCase) >= 0) return "W";
-            if (key == "FPS") return isTaskbar ? "F" : "FPS";
+            if (key == "FPS") return isTaskbar ? "F" : " FPS";
 
             return "";
         }

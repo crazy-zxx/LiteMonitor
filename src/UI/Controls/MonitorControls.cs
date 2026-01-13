@@ -106,6 +106,7 @@ namespace LiteMonitor.src.UI.Controls
             string userConfig = isTaskbarMode ? item.UnitTaskbar : item.UnitPanel;
             
             // 3. 决定显示文本 (null显示默认值, ""显示空格)
+            // 注意：如果配置是""(隐藏)，我们给输入框显示一个空格" "，让用户知道这里不是空的(默认)，而是特意留空的。
             string displayUnit;
             if (userConfig == null) displayUnit = defUnit;   // Auto -> 显示默认
             else if (userConfig == "") displayUnit = " ";    // Hide -> 显示空格
@@ -179,9 +180,6 @@ namespace LiteMonitor.src.UI.Controls
             // null -> 默认, "" -> 空格
             string display = (userConfig == null) ? defUnit : (userConfig == "" ? " " : userConfig);
             _inputUnit.Inner.Text = display;
-
-            // 这里的 Placeholder 虽然 LiteUnderlineInput 没有直接暴露修改方法，
-            // 但如果用户清空文本，我们希望它回填 defUnit，这一步在 SyncToConfig 逻辑中通过 Text 覆盖实现。
             
             ApplyModeVisibility();
         }
@@ -204,29 +202,31 @@ namespace LiteMonitor.src.UI.Controls
             Config.TaskbarLabel = string.Equals(valShort, originalShort, StringComparison.OrdinalIgnoreCase) ? "" : valShort;
 
             // ★★★ 核心修改：保存单位逻辑 ★★★
-            string rawUnit = _inputUnit.Inner.Text; 
+            string rawUnit = _inputUnit.Inner.Text; // 【关键】不使用 Trim()，保留用户输入的空格
+            
+            // 获取当前模式下的默认单位，用于对比
             string defUnit = UIUtils.GetDefaultUnit(Config.Key, _isTaskbarMode);
 
             string finalVal;
 
             if (string.IsNullOrEmpty(rawUnit)) 
             {
-                // 情况1：清空 -> 恢复默认 (Auto)
+                // 情况1：用户清空输入框 -> 恢复默认 (Auto/null)
                 finalVal = null;
             }
             else if (string.IsNullOrWhiteSpace(rawUnit))
             {
-                // 情况2：纯空格 -> 强制隐藏
+                // 情况2：用户只输入了空格 (" ") -> 强制不显示 ("")
+                // 这里的逻辑必须保留：纯空格意味着用户想隐藏单位
                 finalVal = "";
             }
             else
             {
-                // 保留用户输入的空格
-                string val = rawUnit; 
+                string val = rawUnit; // 已经是原始值了
 
-                // 情况3：内容对比
-                // ★★★ 修改点：改为 Ordinal (区分大小写) ★★★
-                // 这样用户输入 {u}/S 时，不会因为等于 {u}/s (忽略大小写) 而被误判为默认值
+                // 情况3：用户输入了内容
+                // 【关键】使用 Ordinal 区分大小写。
+                // 如果用户输入 "{u}/S"，不等于默认的 "{u}/s"，会作为自定义值保存。
                 if (string.Equals(val, defUnit, StringComparison.Ordinal))
                     finalVal = null;
                 else
@@ -239,10 +239,6 @@ namespace LiteMonitor.src.UI.Controls
             Config.VisibleInPanel = _chkPanel.Checked;
             Config.VisibleInTaskbar = _chkTaskbar.Checked;
         }
-
-
-
-        
     }
 
     public class MonitorGroupHeader : Panel
