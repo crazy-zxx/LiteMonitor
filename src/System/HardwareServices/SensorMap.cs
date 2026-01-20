@@ -274,6 +274,13 @@ namespace LiteMonitor.src.SystemServices
                     }
                 }
                 if (s.SensorType == SensorType.Power && (Has(name, "package") || Has(name, "cores"))) return "CPU.Power";
+                // [New] CPU Voltage
+                if (s.SensorType == SensorType.Voltage && (Has(name, "core") || Has(name, "cpu") || Has(name, "vcore") || Has(name, "vid"))) 
+                {
+                    // Exclude distractions
+                    if (!Has(name, "soc") && !Has(name, "gt") && !Has(name, "sa") && !Has(name, "aux")) 
+                        return "CPU.Voltage";
+                }
             }
 
             // --- GPU ---

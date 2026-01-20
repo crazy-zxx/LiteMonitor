@@ -1,19 +1,30 @@
 {
   "Title": "⚡️LiteMonitor",
   "Groups": {
+    "DASH": "ℹ️Tableau de bord",
     "CPU": "💻CPU",
     "GPU": "🎮GPU",
     "HOST": "🖥️Host",
 
     "DISK": "💽Disque",
     "NET": "🌐Réseau",
-    "DATA": "📈Données"
+    "DATA": "📈Données",
+    "BAT": "🔋Batterie"
   },
   "Items": {
+    "DASH.HOST": "Hôte",
+    "DASH.Time": "Heure",
+    "DASH.IP": "IP",
+    "DASH.Uptime": "Démaré",
+    "BAT.Percent": "Batterie",
+    "BAT.Power": "Watts Batt",
+    "BAT.Voltage": "Volt Batt",
+    "BAT.Current": "Amp Batt",
     "CPU.Load": "Usage CPU",
     "CPU.Temp": "Temp CPU",
     "CPU.Clock": "Fréq CPU",
     "CPU.Power": "Watts CPU",
+    "CPU.Voltage": "Volt CPU",
     "CPU.Fan": "Vent CPU",
     "CPU.Pump": "Pompe CPU",
     "GPU.Load": "Usage GPU",
@@ -35,10 +46,19 @@
     "DATA.DayDown": "Reçu Jour"
   },
   "Short": {
+    "DASH.HOST": " ",
+    "DASH.Time": " ",
+    "DASH.IP": " ",
+    "DASH.Uptime": " ",
+    "BAT.Percent": "🔋",
+    "BAT.Power": "🔋",
+    "BAT.Voltage": "🔋",
+    "BAT.Current": "🔋",
     "CPU.Load": "CPU",
     "CPU.Temp": "CPU",
     "CPU.Clock": "CCLK",
     "CPU.Power": "CPWR",
+    "CPU.Voltage": "CVOL",
     "CPU.Fan": "CFAN",
     "CPU.Pump": "Pompe",
     "GPU.Load": "GPU",

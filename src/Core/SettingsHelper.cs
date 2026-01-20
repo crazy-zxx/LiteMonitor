@@ -98,8 +98,10 @@ namespace LiteMonitor
                 new MonitorItemConfig { Key = "CPU.Temp",  SortIndex = 202, VisibleInPanel = true, VisibleInTaskbar = true },
                 new MonitorItemConfig { Key = "CPU.Clock", SortIndex = 203, VisibleInPanel = false },
                 new MonitorItemConfig { Key = "CPU.Power", SortIndex = 204, VisibleInPanel = false },
-                new MonitorItemConfig { Key = "CPU.Fan",   SortIndex = 205, VisibleInPanel = false },
-                new MonitorItemConfig { Key = "CPU.Pump",  SortIndex = 206, VisibleInPanel = false },
+                // [New] CPU Voltage
+                new MonitorItemConfig { Key = "CPU.Voltage", SortIndex = 205, VisibleInPanel = false },
+                new MonitorItemConfig { Key = "CPU.Fan",   SortIndex = 206, VisibleInPanel = false },
+                new MonitorItemConfig { Key = "CPU.Pump",  SortIndex = 207, VisibleInPanel = false },
 
                 // [3xx] GPU
                 new MonitorItemConfig { Key = "GPU.Load",  SortIndex = 301, VisibleInPanel = true, VisibleInTaskbar = true },

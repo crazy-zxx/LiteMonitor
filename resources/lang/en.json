@@ -1,6 +1,7 @@
 {
   "Title": "⚡️LiteMonitor",
   "Groups": {
+    "DASH": "ℹ️Dashboard",
     "CPU": "💻CPU",
     "GPU": "🎮GPU",
     "HOST": "🖥️Host",
@@ -22,6 +23,7 @@
     "CPU.Temp": "CPU Temp",
     "CPU.Clock": "CPU Clock",
     "CPU.Power": "CPU Pwr",
+    "CPU.Voltage": "CPU Volt",
     "CPU.Fan": "CPU Fan",
     "CPU.Pump": "CPU Pump",
     "GPU.Load": "GPU Usage",
@@ -51,6 +53,7 @@
     "CPU.Temp": "CPU",
     "CPU.Clock": "CCLK",
     "CPU.Power": "CPWR",
+    "CPU.Voltage": "CVOL",
     "CPU.Fan": "CFAN",
     "CPU.Pump": "Pump",
     "GPU.Load": "GPU",

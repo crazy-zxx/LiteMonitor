@@ -174,6 +174,9 @@ namespace LiteMonitor.src.Core
             }
 
             if (key == "FPS") return ($"{v:0}", " FPS");
+            
+            // [New] CPU Voltage (2 decimal places)
+            if (key == "CPU.Voltage") return ($"{v:F2}", "V");
 
             // [新增] 电池专用逻辑 (BAT.*)
             if (key.StartsWith("BAT", StringComparison.OrdinalIgnoreCase))
@@ -260,7 +263,7 @@ namespace LiteMonitor.src.Core
                 key.IndexOf("PUMP", StringComparison.OrdinalIgnoreCase) >= 0) return isTaskbar ? "R" : " RPM";
             if (key.IndexOf("CLOCK", StringComparison.OrdinalIgnoreCase) >= 0) return "GHz";
             if (key.IndexOf("POWER", StringComparison.OrdinalIgnoreCase) >= 0) return "W";
-            if (key == "BAT.Voltage") return "V";
+            if (key == "BAT.Voltage" || key == "CPU.Voltage") return "V";
             if (key == "BAT.Current") return "A";
             if (key == "FPS") return isTaskbar ? "F" : " FPS";
 
@@ -402,6 +405,7 @@ namespace LiteMonitor.src.Core
                 key.IndexOf("FAN", StringComparison.OrdinalIgnoreCase) >= 0 || 
                 key.IndexOf("PUMP", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 key.IndexOf("FPS", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                key.IndexOf("Voltage", StringComparison.OrdinalIgnoreCase) >= 0 || // [Fix] Include Voltage
                 (key.StartsWith("BAT") && key.IndexOf("Percent", StringComparison.OrdinalIgnoreCase) < 0))
             {
                 value = GetAdaptivePercentage(key, value) * 100;
@@ -540,6 +544,7 @@ namespace LiteMonitor.src.Core
                 key.IndexOf("FAN", StringComparison.OrdinalIgnoreCase) >= 0 || 
                 key.IndexOf("PUMP", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 key.IndexOf("FPS", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                key.IndexOf("Voltage", StringComparison.OrdinalIgnoreCase) >= 0 || // [Fix] Include Voltage
                 (key.StartsWith("BAT") && key.IndexOf("Percent", StringComparison.OrdinalIgnoreCase) < 0)) 
             {
                 return GetAdaptivePercentage(key, value);
@@ -604,6 +609,7 @@ namespace LiteMonitor.src.Core
             else if (key == "CASE.Fan") max = cfg.RecordedMaxChassisFan;
             else if (key == "GPU.Fan") max = cfg.RecordedMaxGpuFan;
             else if (key == "FPS") max = cfg.RecordedMaxFps;
+            else if (key == "CPU.Voltage") max = 1.6f; // [Fix] Use Settings Value
             // [新增] 电池固定最大值 (基于主流笔记本)
             else if (key == "BAT.Power") max = 100f;   // 100W PD快充
             else if (key == "BAT.Voltage") max = 20f;  // 20V
