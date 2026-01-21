@@ -250,9 +250,9 @@ namespace LiteMonitor.src.UI.Controls
             
             // 同样应用动态值检查逻辑
             string defShortKey = UIUtils.Intern("Short." + Config.Key);
-            string defShort = LanguageManager.T(defShortKey);
-            if (defShort.StartsWith("Short.")) defShort = Config.Key.Split('.')[1];
-
+            // [Fix] Must use GetOriginal to ignore current user overrides, otherwise it will toggle back to default
+            string defShort = LanguageManager.GetOriginal(defShortKey); 
+            
             // 如果等于默认值，或者等于当前的动态简称，则存为空字符串 (恢复自动模式)
             if (valShort != " " && (valShort == defShort || valShort == Config.DynamicTaskbarLabel))
                 Config.TaskbarLabel = "";

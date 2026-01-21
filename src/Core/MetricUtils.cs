@@ -50,6 +50,9 @@ namespace LiteMonitor.src.Core
                 if (key.IndexOf("Power", StringComparison.OrdinalIgnoreCase) >= 0) return MetricType.Power;
                 return MetricType.Percent;
             }
+            if (key.IndexOf("MEM", StringComparison.OrdinalIgnoreCase) >= 0 || 
+                key.IndexOf("VRAM", StringComparison.OrdinalIgnoreCase) >= 0) return MetricType.Memory;
+
             if (key.IndexOf("LOAD", StringComparison.OrdinalIgnoreCase) >= 0) return MetricType.Percent;
             if (key.IndexOf("TEMP", StringComparison.OrdinalIgnoreCase) >= 0) return MetricType.Temperature;
             if (key.IndexOf("CLOCK", StringComparison.OrdinalIgnoreCase) >= 0) return MetricType.Frequency;
@@ -60,9 +63,7 @@ namespace LiteMonitor.src.Core
             if (key.StartsWith("NET", StringComparison.OrdinalIgnoreCase) || 
                 key.StartsWith("DISK", StringComparison.OrdinalIgnoreCase)) return MetricType.DataSpeed;
             if (key.IndexOf("DATA", StringComparison.OrdinalIgnoreCase) >= 0) return MetricType.DataSize;
-            if (key.IndexOf("MEM", StringComparison.OrdinalIgnoreCase) >= 0 || 
-                key.IndexOf("VRAM", StringComparison.OrdinalIgnoreCase) >= 0) return MetricType.Memory;
-
+            
             return MetricType.Unknown;
         }
 

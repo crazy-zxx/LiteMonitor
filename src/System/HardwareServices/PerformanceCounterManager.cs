@@ -31,6 +31,11 @@ namespace LiteMonitor.src.SystemServices
         public bool IsInitialized { get; private set; } = false;
 
         /// <summary>
+        /// 获取检测到的物理内存总量 (GB)
+        /// </summary>
+        public float TotalMemoryGB => _totalMemoryMB / 1024f;
+
+        /// <summary>
         /// 异步初始化所有计数器。
         /// <para>建议在程序启动时调用，运行在后台线程，避免阻塞 UI。</para>
         /// </summary>

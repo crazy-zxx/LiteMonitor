@@ -173,8 +173,11 @@ namespace LiteMonitor.src.SystemServices
                             if (memData.Load.HasValue)
                             {
                                 result = memData.Load.Value;
-                                // [可选] 顺便更新一下 TotalGB 用于 UI 显示 (如果 Settings 里还没检测到)
-                                // 这里假设 Settings.DetectedRamTotalGB 逻辑保持原样，或者你可以暴露 Manager 的 TotalMB
+                                // [Fix] 顺便更新一下 TotalGB 用于 UI 显示
+                                if (Settings.DetectedRamTotalGB <= 0 && _perfManager.TotalMemoryGB > 0)
+                                {
+                                    Settings.DetectedRamTotalGB = _perfManager.TotalMemoryGB;
+                                }
                             }
                         }
 
