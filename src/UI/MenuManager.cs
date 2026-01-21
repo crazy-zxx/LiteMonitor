@@ -671,8 +671,6 @@ namespace LiteMonitor
             speedWindow.Click += (_, __) =>
             {
                 var f = new SpeedTestForm();
-                f.StartPosition = FormStartPosition.Manual;
-                f.Location = new Point(form.Left + 20, form.Top + 20);
                 f.Show();
             };
             menu.Items.Add(speedWindow);
@@ -771,7 +769,13 @@ namespace LiteMonitor
 
             // === 关于 ===
             var about = new ToolStripMenuItem(LanguageManager.T("Menu.About"));
-            about.Click += (_, __) => new AboutForm().ShowDialog(form);
+            about.Click += (_, __) => 
+            {
+                using (var f = new AboutForm())
+                {
+                    f.ShowDialog(form);
+                }
+            };
             menu.Items.Add(about);
 
             menu.Items.Add(new ToolStripSeparator());

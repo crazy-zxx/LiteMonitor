@@ -341,6 +341,22 @@ namespace LiteMonitor
             }
         }
 
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            // 强制居中 (兼容不同DPI和屏幕配置)
+            if (Owner != null)
+                CenterToParent();
+            else
+            {
+                Rectangle screen = Screen.FromPoint(Cursor.Position).WorkingArea;
+                Location = new Point(
+                    screen.Left + (screen.Width - Width) / 2,
+                    screen.Top + (screen.Height - Height) / 2
+                );
+            }
+        }
+
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
@@ -353,7 +369,12 @@ namespace LiteMonitor
             base.OnFormClosed(e);
             _localDataTimer?.Stop();
             _localDataTimer?.Dispose();
+            // 标记为已释放，防止异步任务继续回调
+            _isDisposed = true;
         }
+
+        // 添加标志位
+        private bool _isDisposed = false;
 
         // ApplyRounded (使用主题圆角)
         private void ApplyRounded()
@@ -490,11 +511,13 @@ namespace LiteMonitor
                     // 1. 在后台线程直接判断时间，只有超过 100ms 才进入 Invoke
                     // 这样可以避免每秒数千次向 UI 线程发送消息，极大降低了界面卡顿和内存压力
                     long now = stopwatch.ElapsedMilliseconds;
+                    if (_isDisposed) return; // 检查是否已释放
                     if (now - lastUiTick < 100 && now < totalDurationMs) return;
                     lastUiTick = now;
 
                     Invoke(new Action(() =>
                     {
+                        if (_isDisposed || IsDisposed) return; // 双重检查
                         // 1. 更新速度
                         lblSpeed.Text = $"Internet: ↓ {speed:F1} Mbps   ↑ 0.0 Mbps";
 
@@ -539,11 +562,13 @@ namespace LiteMonitor
                 {
                     // ★★★ 核心修复：限频逻辑 ★★★
                     long now = stopwatch.ElapsedMilliseconds;
+                    if (_isDisposed) return; // 检查是否已释放
                     if (now - lastUiTick < 100 && now < totalDurationMs) return;
                     lastUiTick = now;
 
                     Invoke(new Action(() =>
                     {
+                        if (_isDisposed || IsDisposed) return; // 双重检查
                         // 1. 更新速度
                         lblSpeed.Text = $"Internet: ↓ {lastDownload:F1} Mbps   ↑ {speed:F1} Mbps";
 

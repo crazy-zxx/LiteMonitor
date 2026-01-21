@@ -431,7 +431,12 @@ namespace LiteMonitor
 
         private class DisplayItem { public string DateLabel; public DateTime SortDate; public long Upload; public long Download; public long Total => Upload + Download; }
 
-        protected override void OnFormClosed(FormClosedEventArgs e) { _timer.Stop(); base.OnFormClosed(e); }
+        protected override void OnFormClosed(FormClosedEventArgs e) 
+        { 
+            _timer.Stop(); 
+            _timer.Dispose();
+            base.OnFormClosed(e); 
+        }
 
         // 确保窗口在显示时居中
         protected override void OnShown(EventArgs e)
