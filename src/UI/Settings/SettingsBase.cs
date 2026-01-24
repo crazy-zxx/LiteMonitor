@@ -19,8 +19,6 @@ namespace LiteMonitor.src.UI.SettingsPage
         protected MainForm MainForm;
         protected UIController UI;
         
-        // ★★★ Staging Mechanism for Deferred Save ★★★
-        protected List<Action> _saveActions = new List<Action>();
         // ★★★ Refresh Mechanism for Deferred Load ★★★
         protected List<Action> _refreshActions = new List<Action>();
 
@@ -50,11 +48,6 @@ namespace LiteMonitor.src.UI.SettingsPage
             }
         }
 
-        public void RegisterDelaySave(Action action)
-        {
-            _saveActions.Add(action);
-        }
-
         public void RegisterRefresh(Action action)
         {
             _refreshActions.Add(action);
@@ -63,7 +56,6 @@ namespace LiteMonitor.src.UI.SettingsPage
         public virtual void OnShow()
         {
             // Base implementation can be empty or used for common logic
-            // Note: Do NOT clear _saveActions here, as OnShow is called even when _isLoaded is true.
             
             // Execute refresh actions to ensure UI reflects the latest Config
             if (Config != null)
@@ -77,17 +69,15 @@ namespace LiteMonitor.src.UI.SettingsPage
 
         public virtual void Save()
         {
-            // Execute all deferred save actions
-            foreach (var action in _saveActions)
-            {
-                action.Invoke();
-            }
+            // Immediate binding means we don't need to do anything here.
+            // But we keep the method because ISettingsPage requires it.
+            // Subclasses (like PluginPage) can override it for post-save logic.
         }
 
         protected void ClearAndDispose(Control.ControlCollection controls)
         {
             // Clear pending actions whenever we destroy the UI controls
-            _saveActions.Clear();
+            _refreshActions.Clear();
 
             while (controls.Count > 0)
             {

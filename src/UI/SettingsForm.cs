@@ -223,11 +223,16 @@ namespace LiteMonitor.src.UI
             
             // ★★★ Draft 机制核心：提交事务 ★★★
             // 1. 全局校验 (防止全隐藏死锁)
-            if (_draftCfg.HideMainForm && _draftCfg.HideTrayIcon && !_draftCfg.ShowTaskbar)
+            bool noInteractiveWindow = 
+                (_draftCfg.HideMainForm || _draftCfg.ClickThrough) && 
+                (!_draftCfg.ShowTaskbar || _draftCfg.TaskbarClickThrough) &&
+                _draftCfg.HideTrayIcon;
+
+            if (noInteractiveWindow)
             {
-                // 自动纠正：如果都隐藏了，强制显示托盘
+                // 自动纠正：如果所有可交互入口都被封死（隐藏或穿透+隐藏托盘），强制显示托盘
                 _draftCfg.HideTrayIcon = false;
-                MessageBox.Show(LanguageManager.T("Menu.AllHiddenWarning"), "LiteMonitor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("为了防止所有可交互入口都被死锁（隐藏或穿透+隐藏托盘），已强制显示托盘图标。", "LiteMonitor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
 
             // 2. 合并变更到 Live Settings
@@ -238,6 +243,10 @@ namespace LiteMonitor.src.UI
             
             // 4. 应用副作用 (刷新界面)
             AppActions.ApplyAllSettings(_cfg, _mainForm, _ui);
+
+            // 5. [Fix] Rebase Draft to match Live
+            // 将 Live 环境中由插件生成的最新监控项同步回 Draft，并保留动态显示属性
+            SettingsChanger.RebaseDraftMonitorItems(_cfg, _draftCfg);
         }
     }
 }

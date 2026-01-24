@@ -122,10 +122,8 @@
     "Width": "界面宽度",
     "Scale": "界面缩放",
     "Opacity": "透明度",
-    "MemoryDisplayMode": "内存/显存显示",
     "Percent": "百分比",
     "UsedSize": "已用容量",
-    "MemoryDisplayModeTip": "⚠️说明：内存/显存显示模式修改后在所有地方生效",
 
     "__Comment_Page2__": "--- 2. 任务栏设置 (TaskbarPage) ---",
     "TaskbarSettings": "任务栏设置",
@@ -209,6 +207,8 @@
     "UseWinPerCounters": "优先使用系统计数器",
     "UseWinPerCountersTip": "⚠️如数据不准可关闭系统计数器，关闭后，CPU使用率、CPU频率、内存占用、磁盘读取将直读硬件传感器",
     "Refresh": "刷新频率",
+    "IgnoreSMBTraffic": "不统计局域网SMB流量",
+    "MemoryDisplayMode": "内存/显存显示",
     
     "__Comment_Page6__": "--- 6. 插件管理 (PluginPage) ---",
     "Plugins": "插件管理",

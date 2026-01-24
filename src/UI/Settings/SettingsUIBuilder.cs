@@ -25,8 +25,8 @@ namespace LiteMonitor.src.UI.SettingsPage
         {
             var chk = new LiteCheck(get(), LanguageManager.T("Menu.Enable"));
             
-            // Deferred binding: Register action to read value on Save
-            page.RegisterDelaySave(() => set(chk.Checked));
+            // Immediate binding: Update Draft on Change
+            chk.CheckedChanged += (s, e) => set(chk.Checked);
             page.RegisterRefresh(() => chk.Checked = get());
             
             group.AddItem(new LiteSettingsItem(LanguageManager.T(titleKey), chk));
@@ -41,8 +41,8 @@ namespace LiteMonitor.src.UI.SettingsPage
             var input = new LiteUnderlineInput(get(), "", "", 100, null, align);
             if (!string.IsNullOrEmpty(placeholder)) input.Placeholder = placeholder;
 
-            // Deferred binding
-            page.RegisterDelaySave(() => set(input.Inner.Text));
+            // Immediate binding
+            input.Inner.TextChanged += (s, e) => set(input.Inner.Text);
             page.RegisterRefresh(() => input.Inner.Text = get());
             
             group.AddItem(new LiteSettingsItem(LanguageManager.T(titleKey), input));
@@ -57,12 +57,12 @@ namespace LiteMonitor.src.UI.SettingsPage
             var input = new LiteNumberInput(get().ToString(), unit, "", width, color);
             input.Padding = UIUtils.S(new Padding(0, 5, 0, 1)); // Fix vertical alignment
 
-            // Deferred binding with validation
-            page.RegisterDelaySave(() => 
-            {
+            // Immediate Binding: Update Model on TextChange
+            input.Inner.TextChanged += (s, e) => {
                 if (int.TryParse(input.Inner.Text, out int val))
                     set(val);
-            });
+            };
+
             page.RegisterRefresh(() => input.Inner.Text = get().ToString());
             
             group.AddItem(new LiteSettingsItem(LanguageManager.T(titleKey), input));
@@ -77,12 +77,11 @@ namespace LiteMonitor.src.UI.SettingsPage
             var input = new LiteNumberInput(get().ToString(), unit, "", width);
             input.Padding = UIUtils.S(new Padding(0, 5, 0, 1));
 
-            // Deferred binding
-            page.RegisterDelaySave(() => 
-            {
+            // Immediate binding
+            input.Inner.TextChanged += (s, e) => {
                 if (double.TryParse(input.Inner.Text, out double val))
                     set(val);
-            });
+            };
             page.RegisterRefresh(() => input.Inner.Text = get().ToString());
             
             group.AddItem(new LiteSettingsItem(LanguageManager.T(titleKey), input));
@@ -97,8 +96,8 @@ namespace LiteMonitor.src.UI.SettingsPage
             var input = new LiteColorInput(get());
             input.Input.Padding = UIUtils.S(new Padding(0, 5, 0, 1));
 
-            // Deferred binding
-            page.RegisterDelaySave(() => set(input.HexValue));
+            // Immediate binding
+            input.Input.TextChanged += (s, e) => set(input.HexValue);
             page.RegisterRefresh(() => input.HexValue = get());
             
             group.AddItem(new LiteSettingsItem(LanguageManager.T(titleKey), input));
@@ -122,8 +121,8 @@ namespace LiteMonitor.src.UI.SettingsPage
             if (cmb.Items.Contains(current)) cmb.SelectedItem = current;
             else if (cmb.Items.Count > 0) cmb.SelectedIndex = 0;
 
-            // Deferred binding
-            page.RegisterDelaySave(() => set(cmb.Text));
+            // Immediate binding
+            cmb.Inner.SelectedIndexChanged += (s, e) => set(cmb.Text);
             page.RegisterRefresh(() => 
             {
                 string current = get();
@@ -149,8 +148,8 @@ namespace LiteMonitor.src.UI.SettingsPage
             int idx = get();
             if (idx >= 0 && idx < cmb.Items.Count) cmb.SelectedIndex = idx;
 
-            // Deferred binding
-            page.RegisterDelaySave(() => set(cmb.SelectedIndex));
+            // Immediate binding
+            cmb.Inner.SelectedIndexChanged += (s, e) => set(cmb.SelectedIndex);
             page.RegisterRefresh(() => 
             {
                 int idx = get();
@@ -185,8 +184,8 @@ namespace LiteMonitor.src.UI.SettingsPage
             }
 
             cmb.SelectValue(get());
-            // Deferred binding
-            page.RegisterDelaySave(() => set(cmb.SelectedValue));
+            // Immediate binding
+            cmb.Inner.SelectedIndexChanged += (s, e) => set(cmb.SelectedValue);
             page.RegisterRefresh(() => cmb.SelectValue(get()));
             AttachAutoWidth(cmb);
 

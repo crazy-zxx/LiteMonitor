@@ -93,11 +93,10 @@ namespace LiteMonitor.src.UI.Controls
             var inputCrit = new LiteNumberInput(range.Crit.ToString(), unit, LanguageManager.T("Menu.ValueCritColor"), 140, UIColors.TextCrit);
             inputCrit.Padding = UIUtils.S(new Padding(0, 5, 0, 1));
 
-            // Deferred Bindings
-            page.RegisterDelaySave(() => {
-                range.Warn = inputWarn.ValueDouble;
-                range.Crit = inputCrit.ValueDouble;
-            });
+            // Immediate Binding
+            inputWarn.Inner.TextChanged += (s, e) => range.Warn = inputWarn.ValueDouble;
+            inputCrit.Inner.TextChanged += (s, e) => range.Crit = inputCrit.ValueDouble;
+
             page.RegisterRefresh(() => {
                 inputWarn.Inner.Text = range.Warn.ToString();
                 inputCrit.Inner.Text = range.Crit.ToString();

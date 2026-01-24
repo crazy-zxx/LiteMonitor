@@ -72,12 +72,11 @@ namespace LiteMonitor.src.UI.Controls
             };
 
             // 2. Name Label (任务栏模式)
-            // [Fix] 同步运行时动态标签 (InfoService -> Config)
-            string dynLabel = InfoService.Instance.GetValue("PROP.Label." + item.Key);
-            if (!string.IsNullOrEmpty(dynLabel)) item.DynamicLabel = dynLabel;
+            // [Refactor] 使用统一解析器
+            string labelResolved = MetricLabelResolver.ResolveLabel(item);
             
             string defName = LanguageManager.T(UIUtils.Intern("Items." + item.Key));
-            string valName = !string.IsNullOrEmpty(item.DisplayLabel) ? item.DisplayLabel : defName;
+            string valName = !string.IsNullOrEmpty(labelResolved) ? labelResolved : defName;
             
             _lblName = new Label
             {
@@ -96,22 +95,23 @@ namespace LiteMonitor.src.UI.Controls
             { Location = new Point(MonitorLayout.X_COL2, UIUtils.S(8)) };
 
             // 4. Short Input
-            // [Fix] 同步运行时动态标签 (InfoService -> Config)
-            string dynShort = InfoService.Instance.GetValue("PROP.ShortLabel." + item.Key);
-            if (!string.IsNullOrEmpty(dynShort)) item.DynamicTaskbarLabel = dynShort;
+            // [Refactor] 使用统一解析器
+            string shortResolved = MetricLabelResolver.ResolveShortLabel(item);
 
             string defShortKey = UIUtils.Intern("Short." + item.Key);
             string defShort = LanguageManager.T(defShortKey);
             if (defShort.StartsWith("Short.")) defShort = item.Key.Split('.')[1]; 
             
-            string valShort = !string.IsNullOrEmpty(item.DisplayTaskbarLabel) ? item.DisplayTaskbarLabel : defShort;
+            string valShort = !string.IsNullOrEmpty(shortResolved) ? shortResolved : defShort;
             
             _inputShort = new LiteUnderlineInput(valShort, "", "", 80, UIColors.TextMain) 
             { Location = new Point(MonitorLayout.X_COL2, UIUtils.S(8)), Visible = false };
 
             // ★★★ 5. [新增] Unit Input 初始化逻辑 ★★★
             // 1. 根据传入的模式，获取正确的默认单位 (如 Panel="{u}/s", Taskbar="{u}")
-            string defUnit = MetricUtils.GetDefaultUnit(item.Key, isTaskbarMode);
+            // 使用 Settings 上下文，确保用户能看到 {u} 占位符
+            var unitCtx = isTaskbarMode ? MetricUtils.UnitContext.Taskbar : MetricUtils.UnitContext.Settings;
+            string defUnit = MetricUtils.GetDefaultUnit(item.Key, unitCtx);
             
             // 2. 获取当前配置值
             string userConfig = isTaskbarMode ? item.UnitTaskbar : item.UnitPanel;
@@ -184,7 +184,10 @@ namespace LiteMonitor.src.UI.Controls
             _isTaskbarMode = isTaskbarMode;
 
             // 重新获取默认值和配置
-            string defUnit = MetricUtils.GetDefaultUnit(Config.Key, isTaskbarMode);
+            // 使用 Settings 上下文，确保切换模式时，Placeholder 依然正确显示带 {u} 的格式
+            // [Fix] 根据模式动态选择上下文
+            var unitCtx = isTaskbarMode ? MetricUtils.UnitContext.Taskbar : MetricUtils.UnitContext.Settings;
+            string defUnit = MetricUtils.GetDefaultUnit(Config.Key, unitCtx);
             string userConfig = isTaskbarMode ? Config.UnitTaskbar : Config.UnitPanel;
 
             // 更新 Input 状态
@@ -208,6 +211,15 @@ namespace LiteMonitor.src.UI.Controls
             string valName = _inputName.Inner.Text; // 不使用 Trim，允许用户输入空格隐藏
             string originalName = LanguageManager.GetOriginal(UIUtils.Intern("Items." + Config.Key));
             
+            // [Fix] Handle untranslated plugin keys (e.g. DASH.UniversalAPI.0.val)
+            // If GetOriginal returns the full key (fallback), try to extract the last part as the field name
+            if (Config.Key.StartsWith("DASH.") && originalName.Contains("DASH."))
+            {
+                int lastDot = originalName.LastIndexOf('.');
+                if (lastDot >= 0 && lastDot < originalName.Length - 1) 
+                    originalName = originalName.Substring(lastDot + 1);
+            }
+
             // 规范化：如果是纯空格，则转为一个空格
             if (valName.Length > 0 && string.IsNullOrWhiteSpace(valName))
             {
@@ -226,9 +238,13 @@ namespace LiteMonitor.src.UI.Controls
                 }
             }
 
+            // [Improvement] Check against current runtime dynamic label as well
+            string currentDynamicLabel = InfoService.Instance.GetValue("PROP.Label." + Config.Key);
+            if (string.IsNullOrEmpty(currentDynamicLabel)) currentDynamicLabel = Config.DynamicLabel;
+
             // 如果等于默认值，或者等于当前的动态值，则存为空字符串 (恢复自动模式)
             // 否则存为用户自定义值 (锁定模式)
-            if (valName != " " && (string.Equals(valName, originalName, StringComparison.OrdinalIgnoreCase) || valName == Config.DynamicLabel))
+            if (valName != " " && (string.Equals(valName, originalName, StringComparison.OrdinalIgnoreCase) || valName == currentDynamicLabel))
                 Config.UserLabel = "";
             else
                 Config.UserLabel = valName;
@@ -253,11 +269,26 @@ namespace LiteMonitor.src.UI.Controls
             // [Fix] Must use GetOriginal to ignore current user overrides, otherwise it will toggle back to default
             string defShort = LanguageManager.GetOriginal(defShortKey); 
             
-            // 如果等于默认值，或者等于当前的动态简称，则存为空字符串 (恢复自动模式)
-            if (valShort != " " && (valShort == defShort || valShort == Config.DynamicTaskbarLabel))
+            // 获取当前理论上的动态 Short (InfoService > DynamicShort > null)
+            string currentDynamicShort = InfoService.Instance.GetValue("PROP.ShortLabel." + Config.Key);
+            if (string.IsNullOrEmpty(currentDynamicShort)) currentDynamicShort = Config.DynamicTaskbarLabel;
+
+            if (valShort == "")
+            {
                 Config.TaskbarLabel = "";
+            }
+            else if (valShort == " ")
+            {
+                Config.TaskbarLabel = " ";
+            }
             else
-                Config.TaskbarLabel = valShort;
+            {
+                 // 如果等于默认值，或者等于当前的动态简称，则存为空字符串 (恢复自动模式)
+                if (valShort == defShort || valShort == currentDynamicShort)
+                    Config.TaskbarLabel = "";
+                else
+                    Config.TaskbarLabel = valShort;
+            }
             
             // 最终赋值 (逻辑已在上方处理完毕)
             // 无需再次检查，直接使用计算好的 valShort 即可
@@ -267,7 +298,9 @@ namespace LiteMonitor.src.UI.Controls
             string rawUnit = _inputUnit.Inner.Text; // 【关键】不使用 Trim()，保留用户输入的空格
             
             // 获取当前模式下的默认单位，用于对比
-            string defUnit = MetricUtils.GetDefaultUnit(Config.Key, _isTaskbarMode);
+            // 保存时同样需要对比 Settings 上下文下的默认值 (因为输入框显示的是 Settings 格式)
+            var unitCtx = _isTaskbarMode ? MetricUtils.UnitContext.Taskbar : MetricUtils.UnitContext.Settings;
+            string defUnit = MetricUtils.GetDefaultUnit(Config.Key, unitCtx);
             string finalVal;
 
             if (string.IsNullOrEmpty(rawUnit)) 

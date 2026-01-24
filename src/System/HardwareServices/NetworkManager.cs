@@ -33,6 +33,15 @@ namespace LiteMonitor.src.SystemServices
         private static string _staticIPCache = "";// [修改] 增加IP静态缓存，切换主题/重启服务时不丢失，解决闪烁问题
         private static DateTime _lastIPCheckTime = DateTime.MinValue; // 上次检查IP的时间
 
+        // ★★★ 依赖注入：性能计数器 (用于获取 SMB 流量) ★★★
+        private readonly PerformanceCounterManager _perfManager;
+
+        public NetworkManager(PerformanceCounterManager perfManager = null)
+        {
+            // 允许为空 (为了兼容性)，如果为空则内部功能自动禁用
+            _perfManager = perfManager ?? new PerformanceCounterManager(); 
+        }
+
         public void ClearCache()
         {
             _netStates.Clear();
@@ -143,13 +152,28 @@ namespace LiteMonitor.src.SystemServices
             try
             {
                 var props = nic.GetIPProperties();
+                string bestIP = null;
+
                 foreach (var ip in props.UnicastAddresses)
                 {
                     if (ip.Address.AddressFamily == AddressFamily.InterNetwork)
                     {
-                        return ip.Address.ToString();
+                        string ipStr = ip.Address.ToString();
+                        
+                        // [Fix #206] 优先返回 192.168.x.x 类型的内网 IP
+                        if (ipStr.StartsWith("192.168."))
+                        {
+                            return ipStr;
+                        }
+
+                        // 如果还没找到最佳 IP，暂时存第一个找到的 IPv4 作为兜底
+                        if (bestIP == null)
+                        {
+                            bestIP = ipStr;
+                        }
                     }
                 }
+                return bestIP;
             }
             catch { }
             return null;
@@ -342,6 +366,18 @@ namespace LiteMonitor.src.SystemServices
             {
                 finalUp = lhmUpDelta;
                 finalDown = lhmDownDelta;
+            }
+
+            // ★★★ [新增] 忽略内网流量 (SMB) ★★★
+            // 如果用户开启了此选项，且计数器已就绪，则从总流量中扣除 SMB 流量
+            if (cfg.IgnoreSmbTraffic && _perfManager.IsInitialized)
+            {
+                // 获取估算的 SMB 流量 (内部已包含 1.1 倍的协议开销补偿)
+                var smb = _perfManager.GetEstimatedSmbBytes(seconds);
+                
+                // 扣除 (由于采样时间误差，防止扣成负数)
+                if (smb.UpBytes > 0) finalUp = Math.Max(0, finalUp - smb.UpBytes);
+                if (smb.DownBytes > 0) finalDown = Math.Max(0, finalDown - smb.DownBytes);
             }
 
             // D. 存入数据

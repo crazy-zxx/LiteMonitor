@@ -128,8 +128,8 @@ namespace LiteMonitor.src.Plugins
                                 string safeLabel = !string.IsNullOrEmpty(finalName) ? finalName : (tmpl.Meta.Name + " " + output.Key);
                                 string safeShort = !string.IsNullOrEmpty(finalShort) ? finalShort : output.Key;
 
-                                if (string.IsNullOrEmpty(item.DynamicLabel)) item.DynamicLabel = safeLabel;
-                                if (string.IsNullOrEmpty(item.DynamicTaskbarLabel)) item.DynamicTaskbarLabel = safeShort;
+                                if (item.DynamicLabel != safeLabel) { item.DynamicLabel = safeLabel; changed = true; }
+                            if (item.DynamicTaskbarLabel != safeShort) { item.DynamicTaskbarLabel = safeShort; changed = true; }
 
                                 if (item.UnitPanel != output.Unit) { item.UnitPanel = output.Unit; changed = true; }
                                 if (item.UnitTaskbar != output.Unit) { item.UnitTaskbar = output.Unit; changed = true; } // [Fix] Sync Unit to Taskbar as well

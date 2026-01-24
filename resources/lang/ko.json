@@ -123,10 +123,8 @@
     "Width": "너비",
     "Scale": "크기",
     "Opacity": "투명도",
-    "MemoryDisplayMode": "메모리 표시",
     "Percent": "퍼센트",
     "UsedSize": "사용량",
-    "MemoryDisplayModeTip": "⚠️모든 표시에 적용됩니다.",
 
     "__Comment_Page2__": "--- 2. Taskbar ---",
     "TaskbarSettings": "작업 표시줄",
@@ -210,6 +208,8 @@
     "UseWinPerCounters": "시스템 카운터 우선",
     "UseWinPerCountersTip": "⚠️부정확시 끄세요. CPU/GPU/RAM/디스크는 센서에서 직접 읽습니다.",
     "Refresh": "갱신 주기",
+    "IgnoreSMBTraffic": "SMB 트래픽 무시",
+    "MemoryDisplayMode": "메모리 표시",
 
     "__Comment_Page6__": "--- 6. 플러그인 (PluginPage) ---",
     "Plugins": "플러그인 관리",

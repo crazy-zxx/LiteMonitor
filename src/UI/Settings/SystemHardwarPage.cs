@@ -112,6 +112,20 @@ namespace LiteMonitor.src.UI.SettingsPage
             
             group.AddToggle(this, "Menu.UseWinPerCounters", () => Config?.UseWinPerCounters ?? false, v => { if(Config!=null) Config.UseWinPerCounters = v; });
             
+            // ★★★ [新增] 忽略 SMB 流量开关 ★★★
+            // 直接使用中文作为 Key，如果 LanguageManager 找不到 Key 会原样返回
+            group.AddToggle(this, LanguageManager.T("Menu.IgnoreSMBTraffic"),
+                () => Config?.IgnoreSmbTraffic ?? false, 
+                v => { if(Config!=null) Config.IgnoreSmbTraffic = v; }
+            );
+
+            // 内存/显存显示模式 (从主界面设置移来)
+            string[] memOptions = { LanguageManager.T("Menu.Percent"), LanguageManager.T("Menu.UsedSize") };
+            group.AddComboIndex(this, "Menu.MemoryDisplayMode", memOptions,
+                () => Config?.MemoryDisplayMode ?? 0,
+                idx => { if (Config != null) Config.MemoryDisplayMode = idx; }
+            );
+
             int[] rates = { 100, 200, 300, 500, 600, 700, 800, 1000, 1500, 2000, 3000 };
             group.AddCombo(this, "Menu.Refresh", rates.Select(r => r + " ms"),
                 () => (Config?.RefreshMs ?? 1000) + " ms",

@@ -84,7 +84,7 @@ namespace LiteMonitor.src.SystemServices
 
             // 2. 初始化服务
             _sensorMap = new SensorMap();
-            _networkManager = new NetworkManager();
+            _networkManager = new NetworkManager(_perfCounterManager);
             _diskManager = new DiskManager();
             _driverInstaller = new DriverInstaller(cfg, _computer, ReloadComputerSafe);
             _fpsCounter = new FpsCounter(_driverInstaller); // <--- 新增

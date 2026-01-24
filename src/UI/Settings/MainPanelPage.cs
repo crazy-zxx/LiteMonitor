@@ -101,21 +101,12 @@ namespace LiteMonitor.src.UI.SettingsPage
                 () => Math.Round(Config.Opacity * 100) + "%",
                 s => Config.Opacity = MetricUtils.ParseDouble(s) / 100.0);
 
-            // 5. Memory Mode
-            string[] memOptions = { LanguageManager.T("Menu.Percent"), LanguageManager.T("Menu.UsedSize") }; 
-            group.AddComboIndex(this, "Menu.MemoryDisplayMode", memOptions,
-                () => Config.MemoryDisplayMode, 
-                idx => Config.MemoryDisplayMode = idx
-            );
-
-            // 6. Scale
+            // 5. Scale
             double[] scales = { 2.0, 1.75, 1.5, 1.25, 1.0, 0.9, 0.85, 0.8, 0.75, 0.7, 0.6, 0.5 };
             group.AddCombo(this, "Menu.Scale",
                 scales.Select(s => (s * 100) + "%"),
                 () => (Config.UIScale * 100) + "%",
                 s => Config.UIScale = MetricUtils.ParseDouble(s) / 100.0);
-
-            group.AddHint(LanguageManager.T("Menu.MemoryDisplayModeTip"));
 
             AddGroupToPage(group);
         }

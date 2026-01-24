@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices; // [Added] For P/Invoke
 using LiteMonitor.src.SystemServices;
 using LiteMonitor.src.Core;
 
@@ -45,6 +46,10 @@ namespace LiteMonitor.src.SystemServices.InfoService
         private int _lastSecond = -1;
         private string _lastUptimeStr = "";
         private int _lastUptimeMinute = -1;
+
+        // [Fix] 使用 QueryUnbiasedInterruptTime 排除休眠时间，解决"开机一天"的问题
+        [DllImport("kernel32.dll")]
+        private static extern bool QueryUnbiasedInterruptTime(out ulong UnbiasedTime);
 
         /// <summary>
         /// 初始化默认值并启动首次更新
@@ -143,7 +148,24 @@ namespace LiteMonitor.src.SystemServices.InfoService
 
             // Uptime
             // [Optimization] Update every minute, hide seconds
-            TimeSpan ts = TimeSpan.FromMilliseconds(Environment.TickCount64);
+            // [Fix] 改用 QueryUnbiasedInterruptTime (不含休眠) 替代 Environment.TickCount64 (含休眠)
+            TimeSpan ts;
+            try 
+            {
+                if (QueryUnbiasedInterruptTime(out ulong ticks))
+                {
+                    ts = TimeSpan.FromTicks((long)ticks);
+                }
+                else
+                {
+                    // Fallback (虽然理论上不会失败)
+                    ts = TimeSpan.FromMilliseconds(Environment.TickCount64);
+                }
+            }
+            catch 
+            {
+                 ts = TimeSpan.FromMilliseconds(Environment.TickCount64);
+            }
             
             if (now.Minute != _lastUptimeMinute || string.IsNullOrEmpty(_lastUptimeStr))
             {

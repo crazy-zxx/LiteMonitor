@@ -63,7 +63,7 @@
     {
       "key": "val",
       "label": "{{custom_label ?? '自定义API'}}",
-      "short_label": "API",
+      "short_label": "{{custom_label ?? 'API'}}",
       "format_val": "{{result_val}}",
       "color": "{{custom_color}}",
       "unit": ""

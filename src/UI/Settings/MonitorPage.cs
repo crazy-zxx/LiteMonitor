@@ -195,9 +195,23 @@ namespace LiteMonitor.src.UI.SettingsPage
         private string GenerateSignature()
         {
             if (Config?.MonitorItems == null) return "null";
-            // 简单有效的指纹：Item数量 + 所有Key的拼接
-            // 如果你在插件页删除了一个项，数量或 Key 列表会变，指纹就会变，触发刷新。
-            return Config.MonitorItems.Count + "|" + string.Join(",", Config.MonitorItems.Select(x => x.Key));
+            
+            // [Fix] Include DynamicLabel in signature to detect label updates (Plugin Sync)
+            var sb = new System.Text.StringBuilder();
+            sb.Append(Config.MonitorItems.Count);
+            
+            foreach (var item in Config.MonitorItems)
+            {
+                sb.Append('|');
+                sb.Append(item.Key);
+                // 必须包含动态属性，因为 JsonIgnore 导致它们不参与序列化比较
+                // 且 OnShow 中的手动同步逻辑会被 Signature 检查跳过
+                sb.Append(':');
+                sb.Append(item.DynamicLabel ?? ""); 
+                sb.Append(':');
+                sb.Append(item.DynamicTaskbarLabel ?? "");
+            }
+            return sb.ToString();
         }
 
         private void ReloadList()

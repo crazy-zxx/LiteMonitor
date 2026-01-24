@@ -50,7 +50,7 @@ namespace LiteMonitor.src.UI.SettingsPage
             { 
                 Dock = DockStyle.Fill, 
                 AutoScroll = true, 
-                Padding = new Padding(20) // 增加内间距
+                Padding = new Padding(20, 5, 20, 20) // 减少顶部内间距
             };
             this.Controls.Add(_container);
         }
@@ -64,6 +64,7 @@ namespace LiteMonitor.src.UI.SettingsPage
             {
                 // Use Config property to access the latest in-memory state
                 var instances = Config?.PluginInstances ?? Settings.Load().PluginInstances;
+                var liveSettings = Settings.Load();
 
                 foreach (var id in _modifiedInstanceIds)
                 {
@@ -71,6 +72,7 @@ namespace LiteMonitor.src.UI.SettingsPage
                     // Pass the in-memory instance to avoid reading stale config from disk
                     PluginManager.Instance.RestartInstance(id, inst);
                 }
+
                 _modifiedInstanceIds.Clear();
             }
         }
@@ -88,10 +90,14 @@ namespace LiteMonitor.src.UI.SettingsPage
 
         private void RebuildUI()
         {
-            // ★★★ Fix: Save Scroll Position to prevent jumping to top ★★★
-            int savedScroll = _container.VerticalScroll.Value;
+            // 1. Save State
+            int savedScroll = 0;
+            if (_container != null && !_container.IsDisposed)
+            {
+                savedScroll = _container.VerticalScroll.Value;
+            }
 
-            // ★★★ Fix: Save Checkbox States to prevent collapsing on rebuild ★★★
+            // Save Checkbox States
             var savedStates = new Dictionary<string, bool>();
             foreach (var kvp in _toggles)
             {
@@ -102,8 +108,22 @@ namespace LiteMonitor.src.UI.SettingsPage
             }
             _toggles.Clear();
 
+            // 2. Suspend Layout & Clear Controls (Reuse container)
             _container.SuspendLayout();
-            ClearAndDispose(_container.Controls);
+            
+            // Clear pending actions
+            _refreshActions.Clear();
+
+            // Dispose old controls
+            while (_container.Controls.Count > 0)
+            {
+                var ctrl = _container.Controls[0];
+                _container.Controls.RemoveAt(0);
+                ctrl.Dispose();
+            }
+            
+            // Fix: Reset AutoScrollMinSize to prevent ghost whitespace at bottom
+            _container.AutoScrollMinSize = new Size(0, 0);
             
             var templates = PluginManager.Instance.GetAllTemplates();
             // Use Config instead of Settings.Load() to ensure consistency with SettingsForm context
@@ -118,9 +138,10 @@ namespace LiteMonitor.src.UI.SettingsPage
             var hintRow = new LiteActionRow(LanguageManager.T("Menu.PluginHint"), linkDoc);
 
             hintRow.Dock = DockStyle.Top;
-            var hintWrapper = new Panel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 0, 0, 20) };
-            hintWrapper.Controls.Add(hintRow);
-            _container.Controls.Add(hintWrapper);
+            _container.Controls.Add(hintRow);
+            
+            var hintSpacer = new Panel { Dock = DockStyle.Top, Height = 5, BackColor = Color.Transparent };
+            _container.Controls.Add(hintSpacer);
             
             if (instances == null || instances.Count == 0)
             {
@@ -152,22 +173,26 @@ namespace LiteMonitor.src.UI.SettingsPage
                 }
             }
             
-            // ★★★ Fix: Add a transparent spacer to force bottom padding in AutoScroll ★★★
+            // Fix: Add a transparent spacer to force bottom padding in AutoScroll
             var spacer = new Panel 
             { 
                 Dock = DockStyle.Top, 
-                Height = 80, 
+                Height = 40, 
                 BackColor = Color.Transparent 
             };
             _container.Controls.Add(spacer);
             _container.Controls.SetChildIndex(spacer, 0); // Force to be the last docked item (Bottom)
 
-            _container.ResumeLayout();
+            // 3. Resume Layout & Restore Scroll
+            _container.ResumeLayout(true);
 
-            // ★★★ Fix: Restore Scroll Position ★★★
+            // [Fix] Reset AutoScroll to recalculate scrollable area and remove ghost whitespace
+            _container.AutoScroll = false;
+            _container.PerformLayout();
+            _container.AutoScroll = true;
+
             if (savedScroll > 0)
             {
-                _container.PerformLayout(); // Ensure scroll range is updated
                 _container.AutoScrollPosition = new Point(0, savedScroll);
             }
         }
@@ -234,14 +259,15 @@ namespace LiteMonitor.src.UI.SettingsPage
             };
 
             // 3. Refresh Rate
-            group.AddInt(this, LanguageManager.T("Menu.Refresh"), "s", 
+            group.AddInt(this, "Menu.Refresh", "s", 
                 () => inst.CustomInterval > 0 ? inst.CustomInterval : tmpl.Execution.Interval,
                 v => {
                     if (inst.CustomInterval != v) {
                         inst.CustomInterval = v;
                         _modifiedInstanceIds.Add(inst.Id);
                     }
-                }
+                },
+                60, null
             );
 
             // Split Inputs
@@ -409,19 +435,15 @@ namespace LiteMonitor.src.UI.SettingsPage
 
         private void AddGroupToPage(LiteSettingsGroup group)
         {
-            var wrapper = new Panel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 0, 0, 20) };
-            wrapper.Controls.Add(group);
+            // Use a transparent spacer instead of wrapper to reduce nesting depth
+            // This helps prevent "Unable to set Win32 parent" errors caused by deep nesting
+            var spacer = new Panel { Dock = DockStyle.Top, Height = 10, BackColor = Color.Transparent };
             
-            // ★★★ Fix for "Cannot set Win32 parent" Crash ★★★
-            // The crash occurs because we are adding controls to _container while its parent (SettingsForm._pnlContent) 
-            // has layout suspended (WM_SETREDRAW=false). When adding deep hierarchies (PluginPage -> Panel -> LiteSettingsGroup -> Panel -> Controls),
-            // WinForms sometimes fails to resolve the HWND chain correctly if the root is not painting.
-            
-            // By adding to _container directly, we ensure the control tree is built. 
-            // The parent handle should be valid because SettingsForm adds PluginPage BEFORE calling OnShow.
-            
-            _container.Controls.Add(wrapper);
-            _container.Controls.SetChildIndex(wrapper, 0);
+            _container.Controls.Add(spacer);
+            _container.Controls.SetChildIndex(spacer, 0);
+
+            _container.Controls.Add(group);
+            _container.Controls.SetChildIndex(group, 0);
         }
 
         private void SaveAndRestart(PluginInstanceConfig inst)
@@ -454,7 +476,9 @@ namespace LiteMonitor.src.UI.SettingsPage
             var targetConfig = Config ?? Settings.Load();
             SettingsChanger.AddPlugin(targetConfig, newInst);
             
-            PluginManager.Instance.RestartInstance(newInst.Id);
+            // Do NOT start instance immediately for Draft config.
+            // It will be started when user clicks "Apply/Save" via _modifiedInstanceIds logic.
+            _modifiedInstanceIds.Add(newInst.Id);
             
             RebuildUI();
         }
@@ -465,8 +489,11 @@ namespace LiteMonitor.src.UI.SettingsPage
             {
                 var targetConfig = Config ?? Settings.Load();
                 SettingsChanger.RemovePlugin(targetConfig, inst);
-
-                PluginManager.Instance.RemoveInstance(inst.Id);
+                
+                // Do NOT call PluginManager.RemoveInstance directly for Draft.
+                // Just mark it as modified so Save() can handle cleanup (RestartInstance -> null/disabled logic).
+                _modifiedInstanceIds.Add(inst.Id); 
+                
                 RebuildUI();
             }
         }

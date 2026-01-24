@@ -85,11 +85,21 @@ namespace LiteMonitor.src.UI.Helpers
 
                     if (item.Checked && IsHardwareItem(conf.Key))
                     {
-                        string full = conf.DisplayLabel;
+                        // [Refactor] Use unified resolver instead of outdated DisplayLabel property
+                        string full = MetricLabelResolver.ResolveLabel(conf);
                         if (string.IsNullOrEmpty(full))
                         {
                             full = LanguageManager.T("Items." + conf.Key);
-                            if (full.StartsWith("Items.")) full = conf.Key;
+                            if (full.StartsWith("Items.")) 
+                            {
+                                full = conf.Key;
+                                // [Fix] Handle untranslated plugin keys (e.g. DASH.UniversalAPI.0.val)
+                                if (full.StartsWith("DASH.") && full.Contains("."))
+                                {
+                                    int lastDot = full.LastIndexOf('.');
+                                    if (lastDot >= 0) full = full.Substring(lastDot + 1);
+                                }
+                            }
                         }
                         CheckAndRemind(full);
                     }
@@ -125,26 +135,28 @@ namespace LiteMonitor.src.UI.Helpers
                 
                 foreach (var itemConfig in sortedItems)
                 {
-                    // ★★★ [Fix] 同步运行时动态标签 (InfoService -> Config) ★★★
-                    string dynLabel = LiteMonitor.src.SystemServices.InfoService.InfoService.Instance.GetValue("PROP.Label." + itemConfig.Key);
-                    if (!string.IsNullOrEmpty(dynLabel)) itemConfig.DynamicLabel = dynLabel;
-
-                    string dynShort = LiteMonitor.src.SystemServices.InfoService.InfoService.Instance.GetValue("PROP.ShortLabel." + itemConfig.Key);
-                    if (!string.IsNullOrEmpty(dynShort)) itemConfig.DynamicTaskbarLabel = dynShort;
-
-                    // 1. 拼接名称
-                    // Full Name: DisplayLabel > Loc(Items.Key) > Key
-                    string full = itemConfig.DisplayLabel;
-                    if (string.IsNullOrEmpty(full))
+                    // [Refactor] 使用统一解析器
+                    string labelResolved = MetricLabelResolver.ResolveLabel(itemConfig);
+                    string full;
+                    if (!string.IsNullOrEmpty(labelResolved))
+                    {
+                        full = labelResolved;
+                    }
+                    else
                     {
                         full = LanguageManager.T(UIUtils.Intern("Items." + itemConfig.Key));
                         if (full.StartsWith("Items.")) full = itemConfig.Key;
                     }
                     
-                    // Short Name: DisplayTaskbarLabel > Loc(Short.Key) > Key
-                    string shortName = itemConfig.DisplayTaskbarLabel;
+                    // Short Name
+                    string shortResolved = MetricLabelResolver.ResolveShortLabel(itemConfig);
+                    string shortName;
                     
-                    if (string.IsNullOrEmpty(shortName) || shortName == " ")
+                    if (!string.IsNullOrEmpty(shortResolved) && shortResolved != " ")
+                    {
+                        shortName = shortResolved;
+                    }
+                    else
                     {
                          // If hidden or empty, fallback to default localized short name for the menu text
                          shortName = LanguageManager.T(UIUtils.Intern("Short." + itemConfig.Key));
@@ -152,10 +164,10 @@ namespace LiteMonitor.src.UI.Helpers
                     }
 
                     // 2. 构造菜单显示文本
-                    string label = $"{full} ({shortName})";
+                    string finalLabel = $"{full} ({shortName})";
 
                     // 2. 创建菜单
-                    var itemMenu = new ToolStripMenuItem(label)
+                    var itemMenu = new ToolStripMenuItem(finalLabel)
                     {
                         Checked = itemConfig.VisibleInTaskbar,
                         CheckOnClick = true,
@@ -181,19 +193,25 @@ namespace LiteMonitor.src.UI.Helpers
                 // 辅助函数：创建单个菜单项
                 ToolStripMenuItem CreateItemMenu(MonitorItemConfig itemConfig)
                 {
-                     // ★★★ [Fix] 同步运行时动态标签 (InfoService -> Config) ★★★
-                    string dynLabel = LiteMonitor.src.SystemServices.InfoService.InfoService.Instance.GetValue("PROP.Label." + itemConfig.Key);
-                    if (!string.IsNullOrEmpty(dynLabel)) itemConfig.DynamicLabel = dynLabel;
+                     // [Refactor] 使用统一解析器
+                    string labelResolved = MetricLabelResolver.ResolveLabel(itemConfig);
 
-                    string dynShort = LiteMonitor.src.SystemServices.InfoService.InfoService.Instance.GetValue("PROP.ShortLabel." + itemConfig.Key);
-                    if (!string.IsNullOrEmpty(dynShort)) itemConfig.DynamicTaskbarLabel = dynShort;
-                    
-                    // Label: DisplayLabel > Loc(Items.Key) > Key
+                    // Label: Resolved > Loc(Items.Key) > Key
                     string def = LanguageManager.T(UIUtils.Intern("Items." + itemConfig.Key));
-                    if (def.StartsWith("Items.")) def = itemConfig.Key;
-                    string label = !string.IsNullOrEmpty(itemConfig.DisplayLabel) ? itemConfig.DisplayLabel : def;
+                    if (def.StartsWith("Items.")) 
+                    {
+                        def = itemConfig.Key;
+                        // [Fix] Handle untranslated plugin keys
+                        if (def.StartsWith("DASH.") && def.Contains("."))
+                        {
+                            int lastDot = def.LastIndexOf('.');
+                            if (lastDot >= 0) def = def.Substring(lastDot + 1);
+                        }
+                    }
+                    
+                    string finalLabel = !string.IsNullOrEmpty(labelResolved) ? labelResolved : def;
 
-                    var itemMenu = new ToolStripMenuItem(label)
+                    var itemMenu = new ToolStripMenuItem(finalLabel)
                     {
                         Checked = itemConfig.VisibleInPanel,
                         CheckOnClick = true,

@@ -209,7 +209,7 @@ namespace LiteMonitor.src.Plugins
             }
             catch (Exception ex)
             {
-                 HandleExecutionError(inst, tmpl, keySuffix, ex);
+                 HandleExecutionError(inst, tmpl, inputs, keySuffix, ex);
                  return false;
             }
         }
@@ -532,7 +532,7 @@ namespace LiteMonitor.src.Plugins
             }
         }
 
-        private void HandleExecutionError(PluginInstanceConfig inst, PluginTemplate tmpl, string keySuffix, Exception ex)
+        private void HandleExecutionError(PluginInstanceConfig inst, PluginTemplate tmpl, Dictionary<string, string> inputs, string keySuffix, Exception ex)
         {
             // [Fix] If default client encounters network error, force recreate it to pick up potential system proxy changes
             if (ex is HttpRequestException || ex is TaskCanceledException || ex is OperationCanceledException)
@@ -543,15 +543,51 @@ namespace LiteMonitor.src.Plugins
                  InitializeDefaultClient();
             }
 
-            // [Improvement] Only show ERROR status after 3 consecutive failures to avoid flickering on transient network issues?
-            // For now, we still show error immediately, but we might want to log it less verbosely.
-
+            // [Improvement] Even on error, try to resolve labels if possible (so user knows which item failed)
             if (tmpl.Outputs != null)
             {
-                foreach(var o in tmpl.Outputs) 
+                foreach(var output in tmpl.Outputs) 
                 {
-                    string injectKey = inst.Id + keySuffix + "." + o.Key;
+                    string injectKey = inst.Id + keySuffix + "." + output.Key;
+                    
+                    // Inject Error Status
                     InfoService.Instance.InjectValue(injectKey, PluginConstants.STATUS_ERROR);
+
+                    // Try resolve label (ignore errors in template resolution)
+                    try 
+                    {
+                        string itemKey = PluginConstants.DASH_PREFIX + injectKey;
+                        string labelPattern = !string.IsNullOrEmpty(output.Label) ? output.Label : (tmpl.Meta.Name + " " + output.Key);
+                        
+                        string newName = PluginProcessor.ResolveTemplate(labelPattern, inputs);
+                        string newShort = PluginProcessor.ResolveTemplate(output.ShortLabel ?? "", inputs);
+
+                        // Apply default values for missing inputs in labels
+                        if (tmpl.Inputs != null)
+                        {
+                            foreach (var input in tmpl.Inputs)
+                            {
+                                if (!inputs.ContainsKey(input.Key))
+                                {
+                                    newName = newName.Replace("{{" + input.Key + "}}", input.DefaultValue);
+                                    newShort = newShort.Replace("{{" + input.Key + "}}", input.DefaultValue);
+                                }
+                            }
+                        }
+
+                        string propLabelKey = "PROP.Label." + itemKey;
+                        string propShortKey = "PROP.ShortLabel." + itemKey;
+
+                        if (InfoService.Instance.GetValue(propLabelKey) != newName)
+                            InfoService.Instance.InjectValue(propLabelKey, newName);
+
+                        if (InfoService.Instance.GetValue(propShortKey) != newShort)
+                            InfoService.Instance.InjectValue(propShortKey, newShort);
+                    }
+                    catch (Exception lblEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Label resolution failed during error handling: {lblEx.Message}");
+                    }
                 }
             }
             System.Diagnostics.Debug.WriteLine($"Plugin exec error ({inst.Id}): {ex.Message}");

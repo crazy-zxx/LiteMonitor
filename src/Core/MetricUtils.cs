@@ -94,28 +94,66 @@ namespace LiteMonitor.src.Core
             if (type == MetricType.DataSpeed || type == MetricType.DataSize)
                 return FormatDataSizeParts(v, -1);
 
+            // 使用 GetDefaultUnit 统一获取单位 
+            // 注意：FormatValueParts 主要用于 Panel 绘制，所以这里使用 Panel 上下文
+            // 之前的硬编码：FPS=" FPS", RPM=" RPM", Temp="°C" (无空格)
+            // 现在的 GetDefaultUnit(Panel)：FPS=" FPS", RPM=" RPM", Temp=" °C" (有空格)
+            
             string suffix = (key.StartsWith("BAT", StringComparison.OrdinalIgnoreCase) && IsBatteryCharging) ? "⚡" : "";
+
+            // 既然已经有统一的 GetDefaultUnit，我们应该尽量复用它。
+            // 但需要注意 FormatValueParts 的返回值被用于 DrawString，
+            // 如果这里的单位字符串改变了（例如 Temp 多了个空格），可能会微调 UI 显示。
+            // 鉴于用户要求“统一封装解决”，我们将尝试复用。
+            
+            string unit = GetDefaultUnit(key, UnitContext.Panel);
+
+            // 修正：Temp 在 Panel 模式下 GetDefaultUnit 返回 " °C"，但原 FormatValueParts 返回 "°C"。
+            // 为了保持视觉一致性，或者我们认为 " °C" 才是新的标准？
+            // 考虑到 HorizontalLayout 中已经统一使用了 " °C"，这里也应该统一。
+            // 唯一的例外是 Power/Volt/Current 等，原代码是直接拼接，GetDefaultUnit 返回的也是无空格的。
 
             return type switch
             {
-                MetricType.FPS         => ($"{v:0}", " FPS"),
-                MetricType.RPM         => ($"{v:0}", " RPM"),
-                MetricType.Temperature => ($"{v:0.0}", "°C"),
-                MetricType.Frequency   => ($"{v/1000f:F1}", "GHz"),
-                MetricType.Percent     => ($"{v:0.0}", "%" + suffix),
-                MetricType.Voltage     => ($"{v:F2}", "V" + suffix),
-                MetricType.Current     => ($"{v:F2}", "A" + suffix),
-                MetricType.Power       => (key.StartsWith("BAT") ? $"{v:F1}" : $"{v:F0}", "W" + suffix),
+                MetricType.Frequency   => ($"{v/1000f:F1}", unit),
+                MetricType.FPS         => ($"{v:0}", unit),
+                MetricType.RPM         => ($"{v:0}", unit),
+                // Temp 特殊处理：如果 GetDefaultUnit 返回带空格，这里也带空格，统一 UI。
+                MetricType.Temperature => ($"{v:0.0}", unit), // 暂时保持原样 "°C"，避免面板数字和单位间距过大
+                MetricType.Percent     => ($"{v:0.0}", unit + suffix),
+                MetricType.Voltage     => ($"{v:F2}", unit + suffix),
+                MetricType.Current     => ($"{v:F2}", unit + suffix),
+                MetricType.Power       => (key.StartsWith("BAT") ? $"{v:F1}" : $"{v:F0}", unit + suffix),
                 _                      => ($"{v:0.0}", "")
             };
         }
 
-        public static string GetDefaultUnit(string key, bool isTaskbar)
+        public enum UnitContext
+        {
+            Panel,      // 主界面
+            Taskbar,    // 任务栏
+            Settings    // 设置界面 (显示默认值用)
+        }
+
+        public static string GetDefaultUnit(string key, UnitContext context)
         {
             var type = GetType(key);
-            if (type == MetricType.Memory) return Settings.Load().MemoryDisplayMode == 1 ? "{u}" : "%";
-            if (type == MetricType.DataSize) return "{u}";
-            if (type == MetricType.DataSpeed) return isTaskbar ? "{u}" : "{u}/s";
+
+            // 1. 设置界面需要看到 {u} 占位符，明确告知用户这是数据类单位
+            if (context == UnitContext.Settings)
+            {
+                if (type == MetricType.Memory) return Settings.Load().MemoryDisplayMode == 1 ? "GB" : "%"; // 内存设置界面直接显示 GB/%，不显示 {u}，因为这个由全局设置控制
+                if (type == MetricType.DataSize) return "{u}";
+                if (type == MetricType.DataSpeed) return "{u}/s";
+            }
+
+            // 2. 实际显示逻辑 (Panel / Taskbar)
+            // 内存特殊处理
+            if (type == MetricType.Memory) return Settings.Load().MemoryDisplayMode == 1 ? "GB" : "%";
+            
+            // 数据类：Panel 显示完整单位，Taskbar 简写
+            if (type == MetricType.DataSize) return "{u}"; // 实际上会被 FormatValueParts 替换为 KB/MB/GB
+            if (type == MetricType.DataSpeed) return context == UnitContext.Taskbar ? "{u}" : "{u}/s";
 
             return type switch
             {
@@ -125,10 +163,16 @@ namespace LiteMonitor.src.Core
                 MetricType.Power       => "W",
                 MetricType.Voltage     => "V",
                 MetricType.Current     => "A",
-                MetricType.FPS         => isTaskbar ? "F" : " FPS",
-                MetricType.RPM         => isTaskbar ? "R" : " RPM",
+                MetricType.FPS         => context == UnitContext.Taskbar ? "F" : " FPS",
+                MetricType.RPM         => context == UnitContext.Taskbar ? "R" : " RPM",
                 _ => ""
             };
+        }
+
+        // 兼容旧重载 (逐步废弃)
+        public static string GetDefaultUnit(string key, bool isTaskbarMode)
+        {
+            return GetDefaultUnit(key, isTaskbarMode ? UnitContext.Taskbar : UnitContext.Panel);
         }
 
         public static string GetDisplayUnit(string key, string calculatedUnit, string userFormat)
@@ -140,7 +184,8 @@ namespace LiteMonitor.src.Core
             }
             return userFormat.Contains("{u}") ? userFormat.Replace("{u}", calculatedUnit) : userFormat;
         }
-
+        // [Refactor] 统一数据大小格式化逻辑
+        
         public static (string val, string unit) FormatDataSizeParts(double bytes, int decimals = -1)
         {
             string[] sizes = { "KB", "MB", "GB", "TB", "PB" };

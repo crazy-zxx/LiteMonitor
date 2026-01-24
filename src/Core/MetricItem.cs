@@ -46,21 +46,9 @@ namespace LiteMonitor
         {
             get 
             {
-                // [核心逻辑] 优先读取用户配置
-                if (BoundConfig != null && !string.IsNullOrEmpty(BoundConfig.UserLabel))
-                {
-                    return BoundConfig.UserLabel;
-                }
-
-                // [Refactor] 尝试从 InfoService 读取动态 Label (使用缓存的Key)
-                string dynLabel = InfoService.Instance.GetValue(_propLabelKey);
-                if (!string.IsNullOrEmpty(dynLabel)) return dynLabel;
-
-                // 兼容旧逻辑：Config 中的 DynamicLabel
-                if (BoundConfig != null && !string.IsNullOrEmpty(BoundConfig.DynamicLabel))
-                {
-                    return BoundConfig.DynamicLabel;
-                }
+                // [Refactor] 使用统一的 Label 解析器
+                string labelResolved = MetricLabelResolver.ResolveLabel(BoundConfig);
+                if (!string.IsNullOrEmpty(labelResolved)) return labelResolved;
 
                 return _label;
             }
@@ -72,19 +60,9 @@ namespace LiteMonitor
         {
             get 
             {
-                if (BoundConfig != null && !string.IsNullOrEmpty(BoundConfig.TaskbarLabel))
-                {
-                    return BoundConfig.TaskbarLabel;
-                }
-
-                // [Refactor] 尝试从 InfoService 读取动态 ShortLabel (使用缓存的Key)
-                string dynShort = InfoService.Instance.GetValue(_propShortLabelKey);
-                if (!string.IsNullOrEmpty(dynShort)) return dynShort;
-
-                if (BoundConfig != null && !string.IsNullOrEmpty(BoundConfig.DynamicTaskbarLabel))
-                {
-                    return BoundConfig.DynamicTaskbarLabel;
-                }
+                // [Refactor] 使用统一的 Label 解析器
+                string shortResolved = MetricLabelResolver.ResolveShortLabel(BoundConfig);
+                if (!string.IsNullOrEmpty(shortResolved)) return shortResolved;
 
                 return _shortLabel;
             }
@@ -99,6 +77,7 @@ namespace LiteMonitor
         // 缓存字段
         // =============================
         private float _cachedDisplayValue = -99999f; 
+        private bool _cachedChargingState = false; // [Fix] 缓存充电状态，用于触发图标刷新
         private string _cachedNormalText = "";       // 完整文本 (值+单位)
         private string _cachedHorizontalText = "";   // 完整横屏文本
         
@@ -156,9 +135,14 @@ namespace LiteMonitor
             }
 
             // 4. Numeric Value Processing (Hardware items)
-            if (Math.Abs(DisplayValue - _cachedDisplayValue) > 0.05f)
+            // [Fix] 增加充电状态检查：如果数值变了 OR (是电池相关项 AND 充电状态变了) -> 强制刷新
+            bool isBat = Key.StartsWith("BAT", StringComparison.OrdinalIgnoreCase);
+            bool chargingChanged = isBat && (_cachedChargingState != MetricUtils.IsBatteryCharging);
+
+            if (Math.Abs(DisplayValue - _cachedDisplayValue) > 0.05f || chargingChanged)
             {
                 _cachedDisplayValue = DisplayValue;
+                if (isBat) _cachedChargingState = MetricUtils.IsBatteryCharging;
 
                 var (valStr, rawUnit) = MetricUtils.FormatValueParts(Key, DisplayValue);
                 CachedValueText = valStr;

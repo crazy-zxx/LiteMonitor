@@ -392,17 +392,11 @@ namespace LiteMonitor.src.WebServer
             foreach (var item in itemsCopy)
             {
 
-                // ★★★ 修复：优先显示 DisplayLabel (包含 DynamicLabel)，解决插件名称不显示问题 ★★★
-                // 1. 尝试获取 InfoService 中的动态 Label (插件注入)
-                string dynamicLabel = InfoService.Instance.GetValue("PROP.Label." + item.Key);
-                
-                // 2. 确定最终显示名称：用户自定义 > 动态注入 > 静态配置 > 语言包默认
-                string effectiveLabel = !string.IsNullOrEmpty(item.UserLabel) 
-                    ? item.UserLabel 
-                    : (!string.IsNullOrEmpty(dynamicLabel) ? dynamicLabel : item.DynamicLabel);
+                // [Refactor] 使用统一解析器
+                string labelResolved = MetricLabelResolver.ResolveLabel(item);
 
-                string displayName = !string.IsNullOrEmpty(effectiveLabel)
-                    ? effectiveLabel
+                string displayName = !string.IsNullOrEmpty(labelResolved)
+                    ? labelResolved
                     : LanguageManager.T("Items." + item.Key);
                 
                 string groupId = item.UIGroup.ToUpper();
@@ -461,7 +455,8 @@ namespace LiteMonitor.src.WebServer
                         }
                          // Case B: 已知最大值的类型 (Clock/Power/Fan/Pump/FPS/Battery)
                          else if (item.Key.Contains("Clock") || item.Key.Contains("Power") || 
-                            item.Key.Contains("Fan") || item.Key.Contains("Pump") || item.Key.Contains("FPS") || item.Key.Contains("Voltage")) 
+                            item.Key.Contains("Fan") || item.Key.Contains("Pump") || item.Key.Contains("FPS") || 
+                            item.Key.Contains("Voltage") || item.Key.Contains("Current")) 
                         {
                             rawPct = MetricUtils.GetAdaptivePercentage(item.Key, val.Value);
                         }

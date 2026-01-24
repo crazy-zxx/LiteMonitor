@@ -20,13 +20,9 @@ namespace LiteMonitor.src.Core.Actions
             if (live == null || draft == null) return;
 
             // 不应被草稿覆盖的属性黑名单 (运行时数据)
+            //这些值由后台逻辑自动更新。如果不在黑名单中，当你打开设置窗口时（Draft 状态）它们可能已经发生了变化
             var runtimeProps = new HashSet<string>
             {
-                // 最大记录值
-                "RecordedMaxCpuPower", "RecordedMaxCpuClock",
-                "RecordedMaxGpuPower", "RecordedMaxGpuClock",
-                "RecordedMaxCpuFan", "RecordedMaxCpuPump",
-                "RecordedMaxGpuFan", "RecordedMaxChassisFan",
                 
                 // 其他运行时状态
                 "LastAutoNetwork", "LastAutoDisk",
@@ -107,6 +103,36 @@ namespace LiteMonitor.src.Core.Actions
             target.MonitorItems = mergedList;
         }
 
+        /// <summary>
+        /// 在应用设置后，将 Live 环境的最新监控项（包含插件生成的新项）回写同步到 Draft。
+        /// 必须处理深拷贝和动态属性的恢复。
+        /// </summary>
+        public static void RebaseDraftMonitorItems(Settings live, Settings draft)
+        {
+            if (live?.MonitorItems == null || draft == null) return;
+
+            // 1. 通过序列化进行深拷贝，断开引用关联
+            // 注意：这会丢失 [JsonIgnore] 的动态属性
+            var json = System.Text.Json.JsonSerializer.Serialize(live.MonitorItems);
+            var newItems = System.Text.Json.JsonSerializer.Deserialize<List<MonitorItemConfig>>(json) 
+                           ?? new List<MonitorItemConfig>();
+
+            // 2. 恢复动态属性 (Runtime State)
+            // 因为 Draft 是给 UI 用的，必须包含当前的显示名称
+            var liveMap = live.MonitorItems.ToDictionary(x => x.Key);
+            
+            foreach (var item in newItems)
+            {
+                if (liveMap.TryGetValue(item.Key, out var liveItem))
+                {
+                    item.DynamicLabel = liveItem.DynamicLabel;
+                    item.DynamicTaskbarLabel = liveItem.DynamicTaskbarLabel;
+                }
+            }
+
+            draft.MonitorItems = newItems;
+        }
+        
         /// <summary>
         /// 向设置中添加新的插件实例。
         /// </summary>

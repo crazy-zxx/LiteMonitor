@@ -124,10 +124,8 @@
     "Width": "幅",
     "Scale": "拡大率",
     "Opacity": "不透明度",
-    "MemoryDisplayMode": "メモリ表示",
     "Percent": "パーセント",
     "UsedSize": "使用量",
-    "MemoryDisplayModeTip": "⚠️この設定は全ての表示箇所に適用されます。",
 
     "__Comment_Page2__": "--- 2. タスクバー ---",
     "TaskbarSettings": "タスクバー",
@@ -211,6 +209,8 @@
     "UseWinPerCounters": "システムカウンター優先",
     "UseWinPerCountersTip": "⚠️不正確な場合は無効にしてください。CPU/GPU/RAM/ディスクはセンサーから直接読み取られます。",
     "Refresh": "更新頻度",
+    "IgnoreSMBTraffic": "SMB通信を無視",
+    "MemoryDisplayMode": "メモリ表示",
 
     "__Comment_Page6__": "--- 6. プラグイン (PluginPage) ---",
     "Plugins": "プラグイン管理",

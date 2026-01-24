@@ -124,10 +124,8 @@
     "Width": "Largeur",
     "Scale": "Échelle",
     "Opacity": "Opacité",
-    "MemoryDisplayMode": "Aff. RAM",
     "Percent": "Pourcent",
     "UsedSize": "Taille",
-    "MemoryDisplayModeTip": "⚠️S'applique partout.",
 
     "__Comment_Page2__": "--- 2. Barre Tâches ---",
     "TaskbarSettings": "Barre Tâches",
@@ -211,6 +209,8 @@
     "UseWinPerCounters": "Compteurs Système",
     "UseWinPerCountersTip": "⚠️Désactiver si inexact. CPU/GPU/RAM/DISK lues depuis capteurs.",
     "Refresh": "Taux",
+    "IgnoreSMBTraffic": "Ignorer SMB",
+    "MemoryDisplayMode": "Aff. RAM",
 
     "__Comment_Page6__": "--- 6. Plugins (PluginPage) ---",
     "Plugins": "Plugins",

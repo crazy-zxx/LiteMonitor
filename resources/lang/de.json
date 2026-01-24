@@ -123,10 +123,8 @@
     "Width": "Breite",
     "Scale": "Skalier.",
     "Opacity": "Transp.",
-    "MemoryDisplayMode": "RAM Anzeige",
     "Percent": "Prozent",
     "UsedSize": "Absolut",
-    "MemoryDisplayModeTip": "⚠️Gilt für alle Anzeigen.",
 
     "__Comment_Page2__": "--- 2. Taskleiste ---",
     "TaskbarSettings": "Taskleiste",
@@ -210,6 +208,8 @@
     "UseWinPerCounters": "Sys Zähler",
     "UseWinPerCountersTip": "⚠️Deaktivieren bei Ungenauigkeit. CPU/GPU/RAM/DISK von Sensoren gelesen.",
     "Refresh": "Rate",
+    "IgnoreSMBTraffic": "SMB ignorieren",
+    "MemoryDisplayMode": "RAM Anzeige",
 
     "__Comment_Page6__": "--- 6. Plugins (PluginPage) ---",
     "Plugins": "Plugins",

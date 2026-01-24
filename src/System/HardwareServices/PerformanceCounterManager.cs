@@ -21,6 +21,16 @@ namespace LiteMonitor.src.SystemServices
         private PerformanceCounter? _diskActiveCounter;   // 磁盘活动时间 (%)
         private PerformanceCounter? _uptimeCounter;       // 系统运行时间
 
+        // --- SMB 计数器 (用于忽略内网流量) ---
+        // 经过探测发现，SMB Client Shares 经常缺失，而 Redirector (RDR) 和 Server 是更底层的组件
+        // Redirector = 客户端流量 (我访问别人)
+        // Server = 服务端流量 (别人访问我)
+        // 这些通常是 SingleInstance 计数器，实例名为空字符串 ""
+        private PerformanceCounter? _smbClientReadCounter;
+        private PerformanceCounter? _smbClientWriteCounter;
+        private PerformanceCounter? _smbServerReadCounter;
+        private PerformanceCounter? _smbServerWriteCounter;
+
         // --- 静态基准数据 (启动时获取一次即可) ---
         private float _cpuBaseFreq = 0;   // CPU 基准频率 (MHz)
         private float _totalMemoryMB = 0; // 物理内存总量 (MB)
@@ -72,6 +82,15 @@ namespace LiteMonitor.src.SystemServices
                     // 系统：运行时间
                     _uptimeCounter = CreateCounter("System", "System Up Time");
 
+                    // SMB (内网流量)：使用 SMB Client/Server Shares 类别
+                    // Client: Read/Write Bytes/sec
+                    _smbClientReadCounter = CreateCounter("SMB Client Shares", "Read Bytes/sec", "_Total");
+                    _smbClientWriteCounter = CreateCounter("SMB Client Shares", "Write Bytes/sec", "_Total");
+
+                    // Server: Received/Sent Bytes/sec
+                    _smbServerReadCounter = CreateCounter("SMB Server Shares", "Received Bytes/sec", "_Total");
+                    _smbServerWriteCounter = CreateCounter("SMB Server Shares", "Sent Bytes/sec", "_Total");
+
                     // 3. ★关键步骤★：预热 (Pre-warming)
                     // PerformanceCounter 的机制是计算两次采样的时间差。
                     // 第一次调用 NextValue() 永远返回 0。
@@ -83,8 +102,12 @@ namespace LiteMonitor.src.SystemServices
                     _diskWriteCounter?.NextValue();
                     _diskActiveCounter?.NextValue();
                     _uptimeCounter?.NextValue();
+                    
+                    _smbClientReadCounter?.NextValue();
+                    _smbClientWriteCounter?.NextValue();
+                    _smbServerReadCounter?.NextValue();
+                    _smbServerWriteCounter?.NextValue();
 
-                    // 标记初始化完成
                     IsInitialized = true;
                 }
                 catch (Exception ex)
@@ -188,6 +211,48 @@ namespace LiteMonitor.src.SystemServices
         public float? GetUptime() => SafeRead(_uptimeCounter);
 
         /// <summary>
+        /// 获取本周期内估算的 SMB 流量增量 (含协议开销补偿)
+        /// </summary>
+        /// <param name="seconds">距离上次采样的秒数</param>
+        public (long UpBytes, long DownBytes) GetEstimatedSmbBytes(double seconds)
+        {
+            var rate = GetSmbTrafficRate();
+
+            // 增加 10% 的冗余系数，用于抵消 TCP/IP 协议头、SMB 协议头等开销
+            // 否则会出现 "下载 600MB 文件，仍显示有 30MB 流量" 的情况
+            const double OverheadFactor = 1.1;
+
+            long up = (long)(rate.UpRate * seconds * OverheadFactor);
+            long down = (long)(rate.DownRate * seconds * OverheadFactor);
+
+            return (up, down);
+        }
+
+        /// <summary>
+        /// 获取当前内网 SMB 流量速率 (Client + Server)
+        /// <para>单位：Bytes/sec</para>
+        /// </summary>
+        private (float UpRate, float DownRate) GetSmbTrafficRate()
+        {
+            float up = 0;
+            float down = 0;
+
+            // 1. Client (Redirector)
+            // Upload = Transmitted
+            if (_smbClientWriteCounter != null) up += (SafeRead(_smbClientWriteCounter) ?? 0);
+            // Download = Received
+            if (_smbClientReadCounter != null) down += (SafeRead(_smbClientReadCounter) ?? 0);
+
+            // 2. Server
+            // Upload = Transmitted (别人下载我的文件)
+            if (_smbServerWriteCounter != null) up += (SafeRead(_smbServerWriteCounter) ?? 0);
+            // Download = Received (别人传文件给我)
+            if (_smbServerReadCounter != null) down += (SafeRead(_smbServerReadCounter) ?? 0);
+
+            return (up, down);
+        }
+
+        /// <summary>
         /// 包裹 try-catch 的读取，防止运行时因为系统组件重置导致的崩溃
         /// </summary>
         private float? SafeRead(PerformanceCounter? pc)
@@ -213,6 +278,12 @@ namespace LiteMonitor.src.SystemServices
             _diskWriteCounter?.Dispose();
             _diskActiveCounter?.Dispose();
             _uptimeCounter?.Dispose();
+            
+            // 释放 SMB 计数器
+            _smbClientReadCounter?.Dispose();
+            _smbClientWriteCounter?.Dispose();
+            _smbServerReadCounter?.Dispose();
+            _smbServerWriteCounter?.Dispose();
         }
 
         // --- Win32 API 内存结构体定义 ---

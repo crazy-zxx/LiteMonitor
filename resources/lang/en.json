@@ -123,10 +123,8 @@
     "Width": "Width",
     "Scale": "Scale",
     "Opacity": "Opacity",
-    "MemoryDisplayMode": "RAM Display",
     "Percent": "Percent",
     "UsedSize": "Used Size",
-    "MemoryDisplayModeTip": "⚠️Takes effect everywhere.",
 
     "__Comment_Page2__": "--- 2. Taskbar ---",
     "TaskbarSettings": "Taskbar",
@@ -210,6 +208,8 @@
     "UseWinPerCounters": "Use Sys Counters",
     "UseWinPerCountersTip": "⚠️Disable if inaccurate. CPU/GPU/MEM/DISK read from sensors.",
     "Refresh": "Rate",
+    "IgnoreSMBTraffic": "Ignore SMB Traffic",
+    "MemoryDisplayMode": "RAM Display",
 
     "__Comment_Page6__": "--- 6. Plugins (PluginPage) ---",
     "Plugins": "Plugins",

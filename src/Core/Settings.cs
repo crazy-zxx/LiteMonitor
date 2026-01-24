@@ -90,6 +90,9 @@ namespace LiteMonitor
 
         // 开启后：CPU使用率、CPU频率、内存占用、磁盘读写 将优先从 Windows 计数器读取
         public bool UseWinPerCounters { get; set; } = true;
+
+        // ★★★ [新增] 忽略 SMB (局域网文件传输) 流量 ★★★
+        public bool IgnoreSmbTraffic { get; set; } = true;
         
         // ====== 记录与报警 ======
         public float RecordedMaxCpuPower { get; set; } = 65.0f;

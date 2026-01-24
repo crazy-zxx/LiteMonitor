@@ -26,12 +26,6 @@ namespace LiteMonitor
 
         public int PanelWidth { get; private set; }
 
-        // ====== 保留你原始最大宽度模板（横屏模式用） ======
-        private const string MAX_VALUE_NORMAL = "100°C";
-        private const string MAX_VALUE_IO = "999KB";
-        private const string MAX_VALUE_CLOCK = "99GHz"; 
-        private const string MAX_VALUE_POWER = "999W";
-
         public HorizontalLayout(Theme t, int initialWidth, LayoutMode mode, Settings? settings = null)
         {
             _t = t;
@@ -82,86 +76,11 @@ namespace LiteMonitor
                     int widthTop = 0;
                     int widthBottom = 0;
 
-                    // 定义一个局部函数来测量单个 Item 的宽度
-                    int MeasureItem(MetricItem item, bool isTop)
-                    {
-                        if (item == null) return 0;
 
-                        // [通用逻辑] 如果隐藏标签 (ShortLabel 为空 或 " ")，则只计算文本宽
-                        if (string.IsNullOrEmpty(item.ShortLabel) || item.ShortLabel == " ")
-                        {
-                            // 对于 Dashboard/IP 类，直接使用当前文本作为测量依据
-                            // 注意：这里不再用 MaxValueSample，因为这种文本长度是不固定的
-                            string valText = item.TextValue ?? item.GetFormattedText(true);
-                            if (string.IsNullOrEmpty(valText)) return 0;
-
-                            Font valFont = (_mode == LayoutMode.Taskbar) 
-                                ? new Font(s.Font, s.Size, s.Bold ? FontStyle.Bold : FontStyle.Regular) 
-                                : _t.FontItem;
-
-                            int w = TextRenderer.MeasureText(g, valText, valFont,
-                                new Size(int.MaxValue, int.MaxValue),
-                                TextFormatFlags.NoPadding).Width;
-
-                            if (_mode == LayoutMode.Taskbar) valFont.Dispose();
-                            
-                            // 纯文本项建议稍微加一点点左右 padding，防止紧贴
-                            return w + 4; 
-                        }
-                        else
-                        {
-                            // [普通逻辑] 标签 + 数值 + 间距
-                            // 1. Label
-                            string label = item.ShortLabel;
-                            Font labelFont, valueFont;
-                            if (_mode == LayoutMode.Taskbar)
-                            {
-                                var fs = s.Bold ? FontStyle.Bold : FontStyle.Regular;
-                                var f = new Font(s.Font, s.Size, fs);
-                                labelFont = f; valueFont = f;
-                            }
-                            else
-                            {
-                                labelFont = _t.FontItem;
-                                valueFont = _t.FontValue;
-                            }
-                            
-                            int wLabel = TextRenderer.MeasureText(g, label, labelFont, 
-                                new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width;
-
-                            // 2. Value (使用样本值估算 或 真实值)
-                            // ★★★ 修复：如果是 DASH/IP 等纯文本类 (TextValue有值)，直接测量真实文本 ★★★
-                            // 否则对于 IP 这种长文本，使用默认样本(100°C)会导致列宽过窄
-                            string sample;
-                            if (!string.IsNullOrEmpty(item.TextValue))
-                            {
-                                sample = item.TextValue;
-                            }
-                            else
-                            {
-                                sample = GetMaxValueSample(col, isTop); // 注意：这里样本可能不准，但普通项差异不大
-                            }
-
-                            int wValue = TextRenderer.MeasureText(g, sample, valueFont, 
-                                new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width;
-
-                            // 3. Padding
-                            int paddingX = _rowH;
-                            if (_mode == LayoutMode.Taskbar) paddingX = (int)Math.Round(s.Inner * dpi);
-
-                            if (_mode == LayoutMode.Taskbar)
-                            {
-                                labelFont.Dispose();
-                                valueFont.Dispose();
-                            }
-
-                            return wLabel + wValue + paddingX;
-                        }
-                    }
 
                     // 执行测量
-                    widthTop = MeasureItem(col.Top, true);
-                    widthBottom = MeasureItem(col.Bottom, false);
+                    widthTop = MeasureMetricItem(g, col.Top, s);
+                    widthBottom = MeasureMetricItem(g, col.Bottom, s);
 
                     // ★★★ 核心修复：列宽取上下两者的最大值 ★★★
                     // 这样即使 IP 在下面，列宽也会被 IP 撑大；
@@ -219,42 +138,150 @@ namespace LiteMonitor
             return padV * 2 + (isTaskbarSingle ? _rowH : _rowH * 2);
         }
 
+        private int MeasureMetricItem(Graphics g, MetricItem item, Settings.TBStyle s)
+        {
+            if (item == null) return 0;
+
+            float dpi = _dpiScale;
+
+            // [通用逻辑] 如果隐藏标签 (ShortLabel 为空 或 " ")，则只计算文本宽
+            if (string.IsNullOrEmpty(item.ShortLabel) || item.ShortLabel == " ")
+            {
+                // 对于 Dashboard/IP 类，直接使用当前文本作为测量依据
+                string valText = item.TextValue ?? item.GetFormattedText(true);
+                if (string.IsNullOrEmpty(valText)) return 0;
+
+                Font valFont;
+                bool disposeFont = false;
+
+                if (_mode == LayoutMode.Taskbar)
+                {
+                    valFont = new Font(s.Font, s.Size, s.Bold ? FontStyle.Bold : FontStyle.Regular);
+                    disposeFont = true;
+                }
+                else
+                {
+                    valFont = _t.FontItem;
+                }
+
+                try
+                {
+                    int w = TextRenderer.MeasureText(g, valText, valFont,
+                        new Size(int.MaxValue, int.MaxValue),
+                        TextFormatFlags.NoPadding).Width;
+                    
+                    // 纯文本项建议稍微加一点点左右 padding，防止紧贴
+                    return w + 4;
+                }
+                finally
+                {
+                    if (disposeFont) valFont.Dispose();
+                }
+            }
+            else
+            {
+                // [普通逻辑] 标签 + 数值 + 间距
+                // 1. Label
+                string label = item.ShortLabel;
+                Font labelFont, valueFont;
+                bool disposeFont = false;
+
+                if (_mode == LayoutMode.Taskbar)
+                {
+                    var fs = s.Bold ? FontStyle.Bold : FontStyle.Regular;
+                    var f = new Font(s.Font, s.Size, fs);
+                    labelFont = f; valueFont = f;
+                    disposeFont = true;
+                }
+                else
+                {
+                    labelFont = _t.FontItem;
+                    valueFont = _t.FontValue;
+                }
+
+                try
+                {
+                    int wLabel = TextRenderer.MeasureText(g, label, labelFont,
+                        new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width;
+
+                    // 2. Value (使用样本值估算 或 真实值)
+                    string sample = GenerateSampleText(item);
+
+                    int wValue = TextRenderer.MeasureText(g, sample, valueFont,
+                        new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width;
+
+                    // 3. Padding
+                    int paddingX = _rowH;
+                    if (_mode == LayoutMode.Taskbar) paddingX = (int)Math.Round(s.Inner * dpi);
+
+                    return wLabel + wValue + paddingX;
+                }
+                finally
+                {
+                    if (disposeFont)
+                    {
+                        labelFont.Dispose();
+                        // valueFont is same reference as labelFont in Taskbar mode
+                    }
+                }
+            }
+        }
+
+        private string GenerateSampleText(MetricItem item)
+        {
+            // 1. 运行时动态文本 (DASH/IP) 直接返回真实值
+            if (!string.IsNullOrEmpty(item.TextValue)) return item.TextValue;
+
+            // 2. 估算数值宽度
+            var type = MetricUtils.GetType(item.Key);
+            string val = type switch
+            {
+                MetricType.Frequency => "9.9",
+                MetricType.Voltage => "1.25",
+                MetricType.RPM => "9999",
+                MetricType.Memory when _settings.MemoryDisplayMode == 1 => "99.9",
+                MetricType.DataSpeed => "9.9",
+                _ => "999" // 覆盖 Power, Percent(100), Temp(100), DataSize(999), FPS(999)
+            };
+
+            // 3. 确定基础单位 (用于占位或替换 {u})
+            // 使用重构后的 GetDefaultUnit，根据模式自动获取正确的单位（包含空格）
+            string rawUnit = type switch
+            {
+                MetricType.DataSpeed or MetricType.DataSize => "MB",
+                _ => MetricUtils.GetDefaultUnit(item.Key, _mode == LayoutMode.Taskbar ? MetricUtils.UnitContext.Taskbar : MetricUtils.UnitContext.Panel)
+                                .Replace("{u}", "") // 移除占位符
+            };
+
+            // 4. 获取最终显示单位 (处理自定义格式和 Auto 模式)
+            bool isTaskbar = _mode == LayoutMode.Taskbar;
+            string userFmt = isTaskbar ? item.BoundConfig?.UnitTaskbar : item.BoundConfig?.UnitPanel;
+            string unit = MetricUtils.GetDisplayUnit(item.Key, rawUnit, userFmt);
+
+            // [Fix] 任务栏模式下，GetDisplayUnit 可能会强制加上 /s (针对 DataSpeed)，
+            // 但任务栏通常空间紧凑，不显示 /s，这里需要修正以避免列宽过宽。
+            if (isTaskbar && type == MetricType.DataSpeed && unit.EndsWith("/s"))
+            {
+                unit = unit.Substring(0, unit.Length - 2);
+            }
+
+            // 5. 电池充电图标
+            if (MetricUtils.IsBatteryCharging && item.Key.StartsWith("BAT", StringComparison.OrdinalIgnoreCase))
+                unit += "⚡";
+
+            return val + unit;
+        }
+
         private string GetMaxValueSample(Column col, bool isTop)
         {
-            // 1. 优先检查具体的 Item 是否包含动态文本 (DASH/IP 等)
-            // 如果包含，返回其"长度占位符"作为签名。
-            // 这样只有当文本长度变化时 (如 9.9 -> 10.0) 才会触发重排，避免数值微变 (1.2 -> 1.3) 导致的每秒抖动。
             var item = isTop ? col.Top : col.Bottom;
-            if (item != null && !string.IsNullOrEmpty(item.TextValue))
-            {
-                // 使用 '0' 填充相同长度，确保签名随长度变化
+            if (item == null) return "";
+
+            // 动态文本仅关注长度变化
+            if (!string.IsNullOrEmpty(item.TextValue))
                 return new string('0', item.TextValue.Length);
-            }
 
-            // ★★★ 优化：移除 ToUpperInvariant() 分配，改用忽略大小写的比较 ★★★
-            string key = (isTop ? col.Top?.Key : col.Bottom?.Key) ??
-                         (isTop ? col.Bottom?.Key : col.Top?.Key) ?? "";
-
-            // [新增] 电池充电状态下，样本增加 " ⚡" 以撑开列宽
-            string suffix = "";
-            if (MetricUtils.IsBatteryCharging && key.StartsWith("BAT", StringComparison.OrdinalIgnoreCase))
-            {
-                suffix = "⚡"; 
-            }
-
-            // ★★★ 简单匹配，使用 IndexOf 替换 Contains ★★★
-            if (key.IndexOf("CLOCK", StringComparison.OrdinalIgnoreCase) >= 0) return MAX_VALUE_CLOCK + suffix;
-            if (key.IndexOf("POWER", StringComparison.OrdinalIgnoreCase) >= 0) return MAX_VALUE_POWER + suffix;
-
-            bool isIO =
-                key.IndexOf("READ", StringComparison.OrdinalIgnoreCase) >= 0 || 
-                key.IndexOf("WRITE", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                key.IndexOf("UP", StringComparison.OrdinalIgnoreCase) >= 0 || 
-                key.IndexOf("DOWN", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                key.IndexOf("DAYUP", StringComparison.OrdinalIgnoreCase) >= 0 || 
-                key.IndexOf("DAYDOWN", StringComparison.OrdinalIgnoreCase) >= 0;
-
-            return (isIO ? MAX_VALUE_IO : MAX_VALUE_NORMAL) + suffix;
+            return GenerateSampleText(item);
         }
 
         // [通用方案] 获取当前布局的签名是否变化 (用于检测是否需要重绘)
