@@ -103,7 +103,7 @@ namespace LiteMonitor
         public int TaskbarDoubleClickAction { get; set; } = 0;
 
         // 内存/显存显示模式
-        public int MemoryDisplayMode { get; set; } = 0;
+        public int MemoryDisplayMode { get; set; } = 1;
 
         // ★ 2. 运行时缓存：存储探测到的总容量 (GB)
         [JsonIgnore] public static float DetectedRamTotalGB { get; set; } = 0;
