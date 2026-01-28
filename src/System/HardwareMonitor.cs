@@ -39,6 +39,7 @@ namespace LiteMonitor.src.SystemServices
 
         private DateTime _lastTrafficTime = DateTime.Now;
         private DateTime _lastTrafficSave = DateTime.Now;
+        private DateTime _lastMemoryClean = DateTime.Now; // ★★★ 新增：上次静默清理时间
         private DateTime _startTime = DateTime.Now;
         private DateTime _lastSlowScan = DateTime.Now;
         private DateTime _lastDiskBgScan = DateTime.Now;
@@ -237,6 +238,27 @@ namespace LiteMonitor.src.SystemServices
                 {
                     TrafficLogger.Save();
                     _lastTrafficSave = now;
+                }
+
+                // ★★★ [新增] 静默内存清理 (每 5 分钟触发一次) ★★★
+                // 解决用户"手动优化太累"的痛点，自动维持低内存占用
+                if ((now - _lastMemoryClean).TotalMinutes > 5)
+                {
+                    _lastMemoryClean = now;
+                    // 1. 软清理：回收托管堆垃圾 (安全，无副作用)
+                    GC.Collect(2, GCCollectionMode.Optimized); 
+                    
+                    // 2. 硬清理：只有当工作集超过 50MB 时才修剪物理内存
+                    // 避免在内存占用本来就很低时频繁产生缺页中断 (Page Faults)
+                    try 
+                    {
+                        using var proc = System.Diagnostics.Process.GetCurrentProcess();
+                        if (proc.WorkingSet64 > 50 * 1024 * 1024) 
+                        {
+                            EmptyWorkingSet(proc.Handle);
+                        }
+                    } 
+                    catch { }
                 }
 
                 OnValuesUpdated?.Invoke();
