@@ -33,6 +33,7 @@ namespace LiteMonitor.src.UI.SettingsPage
 
             CreateBehaviorCard();
             CreateAppearanceCard();
+            CreateHorizontalModeGroup();
             CreateWebCard();
 
             _container.ResumeLayout();
@@ -110,18 +111,24 @@ namespace LiteMonitor.src.UI.SettingsPage
 
             AddGroupToPage(group);
 
+        }
+
+        private void CreateHorizontalModeGroup()
+        {
             // --- Group: Horizontal Mode ---
             var groupHorz = new LiteSettingsGroup(LanguageManager.T("Menu.Horizontal"));
 
-            // 1. Single Line
-            groupHorz.AddToggle(this, "Menu.TaskbarSingleLine",
-                () => Config.HorizontalSingleLine,
-                v => Config.HorizontalSingleLine = v);
+          
 
-            // 2. Follow Taskbar
+            // 1. Follow Taskbar
             groupHorz.AddToggle(this, "Menu.HorizontalFollowsTaskbar", 
                 () => Config.HorizontalFollowsTaskbar, 
                 v => Config.HorizontalFollowsTaskbar = v);
+                
+            // 2. Single Line
+            groupHorz.AddToggle(this, "Menu.TaskbarSingleLine",
+                () => Config.HorizontalSingleLine,
+                v => Config.HorizontalSingleLine = v);
 
             // 3. Spacing
             groupHorz.AddInt(this, "Menu.TaskbarItemSpacing", "px",

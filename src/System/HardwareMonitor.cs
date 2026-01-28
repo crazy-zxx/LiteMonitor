@@ -257,8 +257,8 @@ namespace LiteMonitor.src.SystemServices
                     TrafficLogger.Save();
                 }
 
-                // 2. 内存软清理: 每 60 秒 (Offset 30s: 避开流量保存)
-                if (_secondsCounter % 60 == 30)
+                // 2. 内存软清理: 每 180 秒 (Offset 30s: 避开流量保存)
+                if (_secondsCounter % 180 == 30)
                 {
                     GC.Collect(2, GCCollectionMode.Optimized); 
                 }
