@@ -158,7 +158,7 @@ namespace LiteMonitor
                 _lastFindHandleTime = DateTime.Now;
             }
 
-            if (Environment.TickCount % 5000 < _cfg.RefreshMs) _bizHelper.CheckTheme();
+            if (Math.Abs(Environment.TickCount) % 5000 < _cfg.RefreshMs) _bizHelper.CheckTheme();
 
             // [Fix Part 1] 防空数据保护
             // 使用临时变量接收，先判断数据有效性，再赋值给成员变量 _cols

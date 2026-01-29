@@ -542,15 +542,19 @@ namespace LiteMonitor.src.SystemServices
         public static void ForceKillZombies()
         {
             // 如果是系统关机，跳过清理以避免 logman.exe 报错 (0xc0000142)
-            // 同时检查 CLR 是否正在关闭 (HasShutdownStarted)
-            if (_isSystemShuttingDown || Environment.HasShutdownStarted) return;
+            if (_isSystemShuttingDown) return;
 
             try
             {
-                // 终止所有名为 LiteMonitorFPS 的进程
+                // 1. 优先终止所有名为 LiteMonitorFPS 的进程 (最重要)
                 foreach (var p in Process.GetProcessesByName("LiteMonitorFPS")) { try { p.Kill(); } catch { } }
-                // 停止 LiteMonitorFPS 会话
-                Process.Start(new ProcessStartInfo { FileName = "logman", Arguments = $"stop {SESSION_NAME} -ets", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(100);
+                
+                // 2. 停止 LiteMonitorFPS 会话
+                // 仅在 CLR 未关闭时尝试调用 logman，避免在程序退出极晚期引发异常
+                if (!Environment.HasShutdownStarted)
+                {
+                    Process.Start(new ProcessStartInfo { FileName = "logman", Arguments = $"stop {SESSION_NAME} -ets", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(100);
+                }
             }
             catch { }
         }

@@ -525,47 +525,49 @@ namespace LiteMonitor.src.SystemServices
                 return Instance._cachedFanList.ToList(); 
             
             var list = new List<string>();
-
-            // 辅助递归函数
-            void ScanHardware(IHardware hw)
+            lock (Instance._lock)
             {
-                // 黑名单：与 SensorMap 保持一致
-                // 坚决排除 显卡、CPU、硬盘、内存、网卡
-                bool isExcluded = hw.HardwareType == HardwareType.GpuNvidia ||
-                                  hw.HardwareType == HardwareType.GpuAmd ||
-                                  hw.HardwareType == HardwareType.GpuIntel ||
-                                  hw.HardwareType == HardwareType.Cpu ||
-                                  hw.HardwareType == HardwareType.Storage ||
-                                  hw.HardwareType == HardwareType.Memory ||
-                                  hw.HardwareType == HardwareType.Network;
-
-                // 只要不在黑名单里，都扫描！
-                if (!isExcluded)
+                // 辅助递归函数
+                void ScanHardware(IHardware hw)
                 {
-                    foreach (var s in hw.Sensors)
+                    // 黑名单：与 SensorMap 保持一致
+                    // 坚决排除 显卡、CPU、硬盘、内存、网卡
+                    bool isExcluded = hw.HardwareType == HardwareType.GpuNvidia ||
+                                    hw.HardwareType == HardwareType.GpuAmd ||
+                                    hw.HardwareType == HardwareType.GpuIntel ||
+                                    hw.HardwareType == HardwareType.Cpu ||
+                                    hw.HardwareType == HardwareType.Storage ||
+                                    hw.HardwareType == HardwareType.Memory ||
+                                    hw.HardwareType == HardwareType.Network;
+
+                    // 只要不在黑名单里，都扫描！
+                    if (!isExcluded)
                     {
-                        // 只列出 Fan 类型 (转速)
-                        if (s.SensorType == SensorType.Fan)
+                        foreach (var s in hw.Sensors)
                         {
-                            // ★★★ 修复：调用统一的 SmartName 方法 ★★★
-                            list.Add(GenerateSmartName(s, hw));
+                            // 只列出 Fan 类型 (转速)
+                            if (s.SensorType == SensorType.Fan)
+                            {
+                                // ★★★ 修复：调用统一的 SmartName 方法 ★★★
+                                list.Add(GenerateSmartName(s, hw));
+                            }
                         }
+                    }
+
+                    // 递归扫描子硬件
+                    foreach (var sub in hw.SubHardware)
+                    {
+                        ScanHardware(sub);
                     }
                 }
 
-                // 递归扫描子硬件
-                foreach (var sub in hw.SubHardware)
+                // 开始扫描根节点
+                foreach (var hw in Instance._computer.Hardware)
                 {
-                    ScanHardware(sub);
+                    ScanHardware(hw);
                 }
             }
-
-            // 开始扫描根节点
-            foreach (var hw in Instance._computer.Hardware)
-            {
-                ScanHardware(hw);
-            }
-            
+                       
             // 排序并去重
             list.Sort(); 
             var final = list.Distinct().ToList();
@@ -586,35 +588,39 @@ namespace LiteMonitor.src.SystemServices
                 return Instance._cachedMoboTempList.ToList();
 
             var list = new List<string>();
-
-            void ScanHardware(IHardware hw)
+            lock (Instance._lock)
             {
-                // 排除逻辑：只想要主板上的传感器，排除 CPU核心、显卡、硬盘、内存条、网卡
-                bool isExcluded = hw.HardwareType == HardwareType.Cpu ||
-                                  hw.HardwareType == HardwareType.GpuNvidia ||
-                                  hw.HardwareType == HardwareType.GpuAmd ||
-                                  hw.HardwareType == HardwareType.GpuIntel ||
-                                  hw.HardwareType == HardwareType.Storage ||
-                                  hw.HardwareType == HardwareType.Memory ||
-                                  hw.HardwareType == HardwareType.Network;
 
-                if (!isExcluded)
+
+                // 辅助递归函数
+                void ScanHardware(IHardware hw)
                 {
-                    foreach (var s in hw.Sensors)
+                    // 排除逻辑：只想要主板上的传感器，排除 CPU核心、显卡、硬盘、内存条、网卡
+                    bool isExcluded = hw.HardwareType == HardwareType.Cpu ||
+                                    hw.HardwareType == HardwareType.GpuNvidia ||
+                                    hw.HardwareType == HardwareType.GpuAmd ||
+                                    hw.HardwareType == HardwareType.GpuIntel ||
+                                    hw.HardwareType == HardwareType.Storage ||
+                                    hw.HardwareType == HardwareType.Memory ||
+                                    hw.HardwareType == HardwareType.Network;
+
+                    if (!isExcluded)
                     {
-                        if (s.SensorType == SensorType.Temperature)
+                        foreach (var s in hw.Sensors)
                         {
-                            // ★★★ 修复：调用统一的 SmartName 方法 ★★★
-                            list.Add(GenerateSmartName(s, hw));
+                            if (s.SensorType == SensorType.Temperature)
+                            {
+                                // ★★★ 修复：调用统一的 SmartName 方法 ★★★
+                                list.Add(GenerateSmartName(s, hw));
+                            }
                         }
                     }
+
+                    foreach (var sub in hw.SubHardware) ScanHardware(sub);
                 }
 
-                foreach (var sub in hw.SubHardware) ScanHardware(sub);
+                foreach (var hw in Instance._computer.Hardware) ScanHardware(hw);
             }
-
-            foreach (var hw in Instance._computer.Hardware) ScanHardware(hw);
-
             list.Sort();
             var final = list.Distinct().ToList();
             if (final.Count > 0) Instance._cachedMoboTempList = final;

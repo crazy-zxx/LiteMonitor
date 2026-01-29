@@ -104,7 +104,8 @@ namespace LiteMonitor.src.Core
             // 2. 数据量/速度 (自动单位缩放)
             if (type == MetricType.DataSpeed || type == MetricType.DataSize)
             {
-                return FormatDataSizeParts(v, compact ? -1 : 1).val;
+                //return FormatDataSizeParts(v, compact ? -1 : 1).val;
+                return FormatDataSizeParts(v,-1 ).val;
             }
 
             // 4. 标准模式 (Panel)
