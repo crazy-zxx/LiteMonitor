@@ -141,7 +141,7 @@ namespace LiteMonitor.src.WebServer
             writer.WriteStartObject("sys");
             writer.WriteString("ip", localIp);
             writer.WriteNumber("port", _currentRunningPort);
-            writer.WriteString("uptime", (DateTime.Now - Process.GetCurrentProcess().StartTime).ToString(@"dd\.hh\:mm\:ss"));
+            writer.WriteString("uptime", (DateTime.Now - Process.GetCurrentProcess().StartTime).ToString(@"hh\:mm\:ss"));
             writer.WriteEndObject();
 
             // "items" array

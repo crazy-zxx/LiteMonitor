@@ -134,7 +134,7 @@ namespace LiteMonitor.src.SystemServices
                     new XElement(ns + "Triggers",
                         new XElement(ns + "LogonTrigger",
                             new XElement(ns + "Enabled", "true"),
-                            new XElement(ns + "Delay", "PT2S")
+                            new XElement(ns + "Delay", "PT5S")
                         )
                     ),
                     new XElement(ns + "Principals",

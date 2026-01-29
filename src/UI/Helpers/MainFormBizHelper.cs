@@ -47,8 +47,6 @@ namespace LiteMonitor.src.UI.Helpers
         {
             InitTray();
             if (_cfg.AutoHide) StartTimer();
-            // 启动检查放在 Initialize 里自动执行
-            _ = RunStartupChecksAsync();
         }
 
         // =================================================================

@@ -296,20 +296,21 @@ namespace LiteMonitor
                          ToolTipIcon.Error);
                 }
             }
-
+            // 这样既检查了驱动，也检查了更新，以及置顶 透明度 穿透 等，而且时机完美（窗口显示后）
+            if (_bizHelper != null)
+            {
+                 _ = _bizHelper.RunStartupChecksAsync();
+            }
             // [Fix] 强制置顶刷新，增加重试机制确保在某些系统环境下依然生效
             if (_cfg.TopMost)
             {
                 this.BeginInvoke(new Action(async () =>
                 {
+                    await Task.Delay(3000);
                     // 1. 立即执行第一次置顶
                     this.TopMost = false;
                     this.TopMost = true;
                     this.BringToFront();
-                    
-                    // 2. 延迟 3秒 后进行二次校验，防止被其他启动项抢夺置顶
-                    await Task.Delay(3000);
-                    if (this.Visible && !this.TopMost) this.TopMost = true;
                 }));
             }
         }
