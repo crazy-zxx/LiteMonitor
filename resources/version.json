@@ -1,6 +1,6 @@
 {
-  "version": "1.2.8",
-  "changelog": "1，增加流量统计排除局域网流量功能\n2，优化和修复部分已知问题",
-  "releaseDate": "2026-01-26",
+  "version": "1.2.9",
+  "changelog": "1，增加横条模式单行显示以及可自定义间距\n2，设置里可关闭自动更新检查\n3，网页版支持访问密码\n4，硬件核心库更新到最新版\n5，优化软件内存和性能消耗\n6，优化和修复其他已知问题",
+  "releaseDate": "2026-01-30",
   "downloadUrl": "https://github.com/Diorser/LiteMonitor/releases"
 }
