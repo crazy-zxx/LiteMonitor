@@ -24,6 +24,10 @@ namespace LiteMonitor
         private ContextMenuStrip? _currentMenu;
         private DateTime _lastFindHandleTime = DateTime.MinValue;
         private string _lastLayoutSignature = "";
+        
+        // [Fix] 新增字段：记录上次构建布局时使用的列表对象引用
+        // 用于检测虽然 Key 签名没变，但对象实例已重建（坐标丢失）的情况
+        private List<Column>? _lastBuiltCols = null;
 
         // 公开属性
         public string TargetDevice { get; private set; } = "";
@@ -70,14 +74,20 @@ namespace LiteMonitor
         {
             _layout = new HorizontalLayout(ThemeManager.Current, 300, LayoutMode.Taskbar, _cfg);
             _lastLayoutSignature = ""; // 重置签名，强制重算
+            _lastBuiltCols = null;     // 重置引用记录
             _winHelper.ApplyLayeredStyle(_bizHelper.TransparentKey, _cfg.TaskbarClickThrough);
             _bizHelper.CheckTheme(true);
 
+            // 注意：这里仍然可能因为 _cols 为空而暂时不 Build，
+            // 但随后的 Tick 会在获取到新数据后自动 Build
             if (_cols != null && _cols.Count > 0)
             {
                 _layout.Build(_cols, _bizHelper.Height);
                 Width = _layout.PanelWidth;
                 _bizHelper.UpdatePlacement(Width);
+                
+                // 更新记录，避免 Tick 重复计算
+                _lastBuiltCols = _cols;
             }
             Invalidate();
         }
@@ -150,27 +160,41 @@ namespace LiteMonitor
 
             if (Environment.TickCount % 5000 < _cfg.RefreshMs) _bizHelper.CheckTheme();
 
-            _cols = _ui.GetTaskbarColumns();
-            if (_cols == null || _cols.Count == 0) return;
+            // [Fix Part 1] 防空数据保护
+            // 使用临时变量接收，先判断数据有效性，再赋值给成员变量 _cols
+            // 防止在 UI 重建期间(RebuildLayout)获取到空列表导致任务栏闪烁或清空
+            var nextCols = _ui.GetTaskbarColumns();
+            if (nextCols == null || nextCols.Count == 0) return;
             
+            _cols = nextCols; // 确认有效后再更新引用
+
             _bizHelper.UpdateTaskbarRect(); 
             
-            // [优化] 增加布局签名检查，只有当水平模式下位宽发生变化，或任务栏高度改变时才重算布局
+            // [Fix Part 2] 布局变更检测
             if (_bizHelper.IsVertical())
             {
                 // 垂直模式逻辑简单且无测量开销，直接重算即可
                 _bizHelper.BuildVerticalLayout(_cols);
                 _lastLayoutSignature = "vertical";
+                _lastBuiltCols = _cols; // 记录引用
             }
             else
             {
                 string currentSig = _layout.GetLayoutSignature(_cols) + "_" + _bizHelper.Height;
-                if (currentSig != _lastLayoutSignature)
+                
+                // 核心修复：
+                // 1. 签名不同 -> 内容变了 -> 重算
+                // 2. 对象引用不同 -> UIController 生成了新对象(坐标未计算) -> 重算
+                bool needRebuild = (currentSig != _lastLayoutSignature) || (_cols != _lastBuiltCols);
+
+                if (needRebuild)
                 {
                     _layout.Build(_cols, _bizHelper.Height);
                     Width = _layout.PanelWidth;
                     Height = _bizHelper.Height;
+                    
                     _lastLayoutSignature = currentSig;
+                    _lastBuiltCols = _cols; // 更新引用记录
                 }
             }
             
@@ -185,6 +209,9 @@ namespace LiteMonitor
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            // ★ 调试验证用：如果消失时出现了一个红块，说明 OnPaint 被调用但 _cols 为空
+            // e.Graphics.FillRectangle(Brushes.Red, 0, 0, 20, 20); 
+
             if (_cols == null) return;
             var g = e.Graphics;
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
