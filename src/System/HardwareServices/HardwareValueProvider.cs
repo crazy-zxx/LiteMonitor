@@ -100,7 +100,12 @@ namespace LiteMonitor.src.SystemServices
                         }
                         else if (s.SensorType == SensorType.Temperature)
                         {
-                            newCache["DISK.Temp"] = s;
+                            // ★★★ [Fix] 仅使用第一个温度传感器，避免被后续的 Controller Temp (通常偏高) 覆盖 ★★★
+                            // 保持与 DiskManager.ReadDiskSensor 逻辑一致
+                            if (!newCache.ContainsKey("DISK.Temp"))
+                            {
+                                newCache["DISK.Temp"] = s;
+                            }
                         }
                     }
                 }
