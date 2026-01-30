@@ -20,10 +20,9 @@ namespace LiteMonitor
 
         private string _key = "";
         
-        // [Optimization] Cached InfoService lookup keys
-        private string _propLabelKey;
-        private string _propShortLabelKey;
-        private string _dashColorKey;
+        // [Optimization] 缓存 InfoService 查找键
+        private string? _dashColorKey;
+        private const string PluginPrefix = "DASH.";
 
         public string Key 
         { 
@@ -31,13 +30,18 @@ namespace LiteMonitor
             set 
             {
                 _key = UIUtils.Intern(value);
-                // Pre-calculate lookup keys
-                _propLabelKey = "PROP.Label." + _key;
-                _propShortLabelKey = "PROP.ShortLabel." + _key;
-                if (_key.StartsWith("DASH."))
-                    _dashColorKey = _key.Substring(5) + ".Color";
+                // 预计算查找键
+                // [Fix] 使用 OrdinalIgnoreCase 并正确处理可空性
+                if (_key.StartsWith(PluginPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    // 移除 "DASH." 前缀 (长度=5) 并追加 ".Color"
+                    // 使用 Span 避免中间子字符串分配 (CA1845)
+                    _dashColorKey = UIUtils.Intern(string.Concat(_key.AsSpan(PluginPrefix.Length), ".Color".AsSpan()));
+                }
                 else
+                {
                     _dashColorKey = null;
+                }
             } 
         }
 

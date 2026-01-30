@@ -131,6 +131,8 @@
     "TaskbarSettings": "任务栏设置",
     "TaskbarShow": "任务栏显示",
     "TaskbarSingleLine": "单行显示",
+    "TaskbarHoverShowAll": "悬浮显示文字提示",
+    "TaskbarHoverShowAllTip": "鼠标悬浮在任务栏监控项上时，以文字提示显示主界面所有监控数据",
     "TaskbarStyle": "任务栏样式",
     "TaskbarMonitor": "显示器屏幕",
     "TaskbarStyleBold": "大字模式",

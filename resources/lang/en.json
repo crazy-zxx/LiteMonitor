@@ -132,6 +132,8 @@
     "TaskbarSettings": "Taskbar",
     "TaskbarShow": "Show Taskbar",
     "TaskbarSingleLine": "Single Line",
+    "TaskbarHoverShowAll": "Hover Tooltip",
+    "TaskbarHoverShowAllTip": "Show all monitoring data in a system tooltip when hovering on taskbar items",
     "TaskbarStyle": "Style",
     "TaskbarMonitor": "Monitor",
     "TaskbarStyleBold": "Big",

@@ -123,6 +123,9 @@ namespace LiteMonitor
             _cfg.SyncToLanguage();
 
             // 1. 初始化业务
+            // ★★★ Fix: 初始化全局 DPI 缩放系数，防止未打开设置面板时弹窗排版异常 ★★★
+            UIUtils.ScaleFactor = this.DeviceDpi / 96f;
+
             TrafficLogger.Load();
             src.Plugins.PluginManager.Instance.LoadPlugins(Path.Combine(AppContext.BaseDirectory, "resources", "plugins"));
             src.Plugins.PluginManager.Instance.Start();

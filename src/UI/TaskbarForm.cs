@@ -24,6 +24,7 @@ namespace LiteMonitor
         private ContextMenuStrip? _currentMenu;
         private DateTime _lastFindHandleTime = DateTime.MinValue;
         private string _lastLayoutSignature = "";
+        private ToolTip? _toolTip;
         
         // 公开属性
         public string TargetDevice { get; private set; } = "";
@@ -63,7 +64,28 @@ namespace LiteMonitor
             _timer.Tick += (_, __) => Tick();
             _timer.Start();
 
+            // 鼠标悬浮提示初始化
+            if (_cfg.TaskbarHoverShowAll)
+            {
+                _toolTip = new ToolTip { InitialDelay = 300, AutoPopDelay = 10000, ShowAlways = true };
+                this.MouseEnter += (s, e) => UpdateToolTip();
+            }
+
             Tick();
+        }
+
+        private void UpdateToolTip()
+        {
+            if (_toolTip == null || !_cfg.TaskbarHoverShowAll || _cfg.TaskbarClickThrough) return;
+
+            var groups = _ui.GetMainGroups();
+            if (groups == null) return;
+
+            var lines = groups.SelectMany(g => 
+                new[] { $"[{g.Label}]" }.Concat(g.Items.Select(it => $"{it.Label}: {it.GetFormattedText(false)}"))
+            );
+
+            _toolTip.SetToolTip(this, string.Join(Environment.NewLine, lines));
         }
 
         public void ReloadLayout()
@@ -91,6 +113,7 @@ namespace LiteMonitor
                 _timer.Stop();
                 _timer.Dispose();
                 _currentMenu?.Dispose();
+                _toolTip?.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -191,6 +214,9 @@ namespace LiteMonitor
             }
             
             _bizHelper.UpdatePlacement(Width);
+            
+            UpdateToolTip();
+
             Invalidate();
         }
 
