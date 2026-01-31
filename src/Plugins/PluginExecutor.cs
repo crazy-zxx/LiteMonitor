@@ -78,6 +78,9 @@ namespace LiteMonitor.src.Plugins
             // Other threads might be using them. Removing them from the dictionary ensures
             // new requests get fresh clients, while old requests can finish (or fail safely).
             _proxyClients.Clear();
+            
+            // [Fix] Also reset native resolvers that might hold network state or cache
+            CityCodeResolver.ResetClient();
         }
 
         public void Dispose()
@@ -249,6 +252,13 @@ namespace LiteMonitor.src.Plugins
                 }
 
                 string url = PluginProcessor.ResolveTemplate(step.Url, context);
+
+                // [Fix] Check for invalid parameters in URL (e.g. "?") to prevent downstream errors
+                if (url.Contains(PluginConstants.STATUS_UNKNOWN) || url.Contains(PluginConstants.STATUS_ERROR))
+                {
+                     throw new Exception($"Step {step.Id} blocked: URL contains invalid parameter. URL: {url}");
+                }
+
                 string body = PluginProcessor.ResolveTemplate(step.Body ?? "", context);
 
                 string contentHash = (url + "|" + body).GetHashCode().ToString("X"); 
@@ -328,6 +338,23 @@ namespace LiteMonitor.src.Plugins
                 
                 // Process
                 PluginProcessor.ApplyTransforms(step.Process, context);
+
+                // [Fix] Validate extracted data before caching
+                // If critical data is missing (Unknown/Error), THROW exception to prevent downstream steps from executing with bad data
+                if (step.Extract != null)
+                {
+                    foreach (var kv in step.Extract)
+                    {
+                        if (context.TryGetValue(kv.Key, out string val))
+                        {
+                            if (val == PluginConstants.STATUS_UNKNOWN || val == PluginConstants.STATUS_ERROR)
+                            {
+                                // [Fix] Fail fast if critical extraction failed
+                                throw new Exception($"Step {step.Id} failed: Extracted invalid value for '{kv.Key}'. Value: '{val}'");
+                            }
+                        }
+                    }
+                }
 
                 // [Fix] Update Cache AFTER successful parsing and processing
                 // This ensures we don't cache invalid data (e.g. HTML error pages that passed HTTP check but failed JSON parse)

@@ -32,7 +32,9 @@ namespace LiteMonitor.src.Plugins.Native
 
             if (string.IsNullOrEmpty(district) && string.IsNullOrEmpty(city))
             {
-                return JsonSerializer.Serialize(new { error = "Empty query" });
+                // [Fix] Throw exception instead of returning error JSON, so that PluginExecutor can catch it and retry properly
+                // Returning a valid JSON with "error" field might be parsed as success by generic JSON extractors if they don't check for "error"
+                throw new ArgumentException("CityCodeResolver: Empty query parameters (province/city/district are all empty).");
             }
 
             // 2. 查找逻辑
@@ -55,7 +57,8 @@ namespace LiteMonitor.src.Plugins.Native
 
             if (candidates == null)
             {
-                return JsonSerializer.Serialize(new { error = "Not Found" });
+                // [Fix] Throw exception to trigger retry mechanism
+                throw new KeyNotFoundException($"CityCodeResolver: No matching city found for query: {province} {city} {district}");
             }
 
             // 4. 评分排序
@@ -106,12 +109,19 @@ namespace LiteMonitor.src.Plugins.Native
             return null;
         }
 
+        public static void ResetClient()
+        {
+            lock (_lock)
+            {
+                _db = null; // Force reload on reset
+            }
+        }
+
         private static async Task EnsureDbLoadedAsync()
         {
             if (_db != null) return;
             if (_isLoading) 
             {
-                // Simple spin wait or just return error to avoid deadlock/complexity in this demo
                 await Task.Delay(100); 
                 if (_db != null) return;
             }
@@ -119,11 +129,22 @@ namespace LiteMonitor.src.Plugins.Native
             _isLoading = true;
             try
             {
-                // 使用默认 HttpClient 下载
-                using (var client = new HttpClient())
+                // [Optimization] Use SocketsHttpHandler with Proxy support and Decompression
+                var handler = new SocketsHttpHandler
+                {
+                    AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate,
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                    UseProxy = true,
+                    // Use system proxy
+                    Proxy = System.Net.WebRequest.GetSystemWebProxy()
+                };
+
+                using (var client = new HttpClient(handler))
                 {
                     // 设置超时
-                    client.Timeout = TimeSpan.FromSeconds(10);
+                    client.Timeout = TimeSpan.FromSeconds(15);
+                    client.DefaultRequestHeaders.Add("User-Agent", "LiteMonitor/1.0");
+                    
                     var json = await client.GetStringAsync(JSON_DB_URL);
                     var rawDb = JsonSerializer.Deserialize<Dictionary<string, List<List<string>>>>(json);
 

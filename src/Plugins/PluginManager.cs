@@ -329,6 +329,15 @@ namespace LiteMonitor.src.Plugins
                         int fails = _consecutiveFailures.AddOrUpdate(inst.Id, 1, (k, v) => v + 1);
                         int backoff = Math.Min(fails * PluginConstants.RETRY_INTERVAL_MS, 60000);
                         
+                        // [Fix] 连续失败达到一定次数时，尝试重置网络客户端，以应对网络环境切换(如VPN/代理)导致的连接僵死
+                        // [Optimization] Reduced threshold from 5 to 3 to recover faster from network changes
+                        if (fails >= 3 && fails % 3 == 0)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Plugin {inst.Id} failed {fails} times. Resetting network clients and clearing cache.");
+                            _executor.ResetNetworkClients();
+                            _executor.ClearCache(inst.Id);
+                        }
+
                         newTimer.Interval = backoff;
                         System.Diagnostics.Debug.WriteLine($"Plugin {inst.Id} failed ({fails} times). Retry in {backoff}ms.");
                     }
