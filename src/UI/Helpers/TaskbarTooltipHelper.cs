@@ -188,12 +188,14 @@ namespace LiteMonitor.src.UI.Helpers
             }
 
             // 再次确认鼠标是否真的在 Form 内（防止 Alt-Tab 等情况导致的事件丢失）
-            if (!_targetForm.Bounds.Contains(Cursor.Position))
-            {
-                _isHovering = false;
-                _tooltipForm?.Hide();
-                return;
-            }
+            // [Fix] 在任务栏自动隐藏模式下，Bounds 判定可能不稳定，导致悬浮窗不显示。
+            // 既然有 MouseEnter/Leave 事件维护状态，这里可以放宽检查，或者直接移除。
+            // if (!_targetForm.Bounds.Contains(Cursor.Position))
+            // {
+            //     _isHovering = false;
+            //     _tooltipForm?.Hide();
+            //     return;
+            // }
             
             // 核心逻辑：只有计时器触发后才允许显示
             if (!_canShow && !_tooltipForm.Visible)
@@ -223,7 +225,9 @@ namespace LiteMonitor.src.UI.Helpers
             // 如果未显示，则显示并定位
             if (!_tooltipForm.Visible)
             {
-                _tooltipForm.UpdatePosition(Cursor.Position);
+                // 获取目标窗体在屏幕上的实际位置
+                var rect = _targetForm.RectangleToScreen(_targetForm.ClientRectangle);
+                _tooltipForm.UpdatePosition(rect, Cursor.Position);
                 _tooltipForm.Show(_targetForm); // 指定 Owner 确保层级正确
             }
             // 注意：我们不在每一帧都 UpdatePosition，否则 ToolTip 会跟着鼠标微颤，

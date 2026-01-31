@@ -139,49 +139,86 @@ namespace LiteMonitor.src.UI.Helpers
             Region = null; 
         }
 
-        public void UpdatePosition(Point cursorPosition)
+        public void UpdatePosition(Rectangle targetRect, Point cursorPosition)
         {
-            var screen = Screen.FromPoint(cursorPosition);
+            var screen = Screen.FromRectangle(targetRect);
             Rectangle workArea = screen.WorkingArea;
-            int offset = S(10);
 
-            // 以鼠标为中心
-            int x = cursorPosition.X - (Width / 2);
-            
-            // Y轴默认显示在鼠标上方
-            int y = cursorPosition.Y - Height - offset;
+            // 缓存宽高属性，减少底层消息调用 (微优化)
+            int w = Width;
+            int h = Height;
 
-            // --- X轴约束 ---
-            if (x < workArea.Left) x = workArea.Left + 4;
-            // 修复：右侧越界时，应该是 (工作区右边界 - 窗体宽度 - 间隙)，否则会延伸到屏幕外或遮挡右侧任务栏
-            if (x + Width > workArea.Right) x = workArea.Right - Width - 4;
+            // ★★★ 极简修复：根据任务栏形状自动判断方向 ★★★
+            bool isVerticalTaskbar = targetRect.Height > targetRect.Width;
 
-            // --- Y轴约束 ---
-            // 1. 底部约束：永远不要超过工作区底部 (防止遮挡底部任务栏)
-            if (y + Height > workArea.Bottom)
+            int x, y;
+
+            if (isVerticalTaskbar)
             {
-                y = workArea.Bottom - Height - 2;
-            }
-
-            // 2. 顶部约束：如果上方空间不足（比如到了屏幕顶端，或者因为刚才的底部约束导致推到了上面去？不对，底部约束是往上推）
-            // 如果 y < workArea.Top，说明上方放不下了（或者遮挡顶部任务栏）
-            if (y < workArea.Top)
-            {
-                // 尝试放在鼠标下方
-                int yBelow = cursorPosition.Y + S(24);
+                // ====== 垂直模式 ======
+                // Y轴：跟随鼠标垂直居中
+                y = cursorPosition.Y - (h / 2);
                 
-                // 如果鼠标下方也在工作区顶部之上（说明鼠标在顶部任务栏里），则必须从工作区顶部开始
-                if (yBelow < workArea.Top)
+                // X轴：贴合任务栏边缘
+                // 判断任务栏在屏幕哪一侧 (使用工作区中心点判断更准确)
+                bool isRightSide = (targetRect.Left + targetRect.Width / 2) > (workArea.Left + workArea.Width / 2);
+
+                if (isRightSide)
                 {
-                    y = workArea.Top + 2;
+                    // 任务栏在右 -> 窗口显示在左侧
+                    x = targetRect.Left - w - S(4);
+                    // 防止超出屏幕左边缘
+                    if (x < workArea.Left) x = workArea.Left + 4;
                 }
                 else
                 {
-                    y = yBelow;
+                    // 任务栏在左 -> 窗口显示在右侧
+                    x = targetRect.Right + S(4);
+                    // 防止超出屏幕右边缘
+                    if (x + w > workArea.Right) x = workArea.Right - w - 4;
+                }
+
+                // Y轴边界检查 (防止上下超出屏幕)
+                if (y < workArea.Top) y = workArea.Top + 4;
+                if (y + h > workArea.Bottom) y = workArea.Bottom - h - 4;
+            }
+            else
+            {
+                // ====== 水平模式 (原有逻辑) ======
+                
+                // 水平方向：优先基于鼠标位置居中 (用户偏好)
+                x = cursorPosition.X - (w / 2);
+                
+                // 垂直方向：基于目标窗体位置 (确保在自动隐藏任务栏时位置稳定)
+                y = targetRect.Top - h - S(4);
+
+                // --- X轴约束 ---
+                if (x < workArea.Left) x = workArea.Left + 4;
+                if (x + w > workArea.Right) x = workArea.Right - w - 4;
+
+                // --- Y轴约束 ---
+                // [逻辑优化] 修正多显示器下的坐标判断 (原代码未考虑 workArea.Top 偏移)
+                bool isBottomSide = targetRect.Top > (workArea.Top + workArea.Height / 2);
+
+                if (isBottomSide)
+                {
+                    // 底部模式：尝试显示在上方
+                    if (y < workArea.Top) y = workArea.Top + 2; 
+                    if (y + h > workArea.Bottom) y = workArea.Bottom - h - 2;
+                }
+                else
+                {
+                    // 顶部/上侧模式：显示在下方
+                    y = targetRect.Bottom + S(4);
+                    if (y + h > workArea.Bottom) y = workArea.Bottom - h - 2;
                 }
             }
 
-            Location = new Point(x, y);
+            // [性能优化] 仅当坐标实际发生变化时才更新 Location，避免不必要的重绘消息
+            if (Location.X != x || Location.Y != y)
+            {
+                Location = new Point(x, y);
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)
