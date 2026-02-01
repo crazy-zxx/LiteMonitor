@@ -161,7 +161,7 @@ namespace LiteMonitor.src.SystemServices
             try
             {
                 // 1. 更新计时器
-                UpdateTiming();
+                double timeDelta = UpdateTiming();
 
                 // 2. 计算更新需求
                 var requirements = CheckUpdateRequirements();
@@ -187,7 +187,8 @@ namespace LiteMonitor.src.SystemServices
 
                         if (hw.HardwareType == HardwareType.Network && requirements.NeedNet)
                         {
-                            _networkManager.ProcessUpdate(hw, _cfg, requirements.TimeDelta, isSlowScanTick);
+                            // ★★★ 修复：使用正确的 timeDelta，而不是 requirements.TimeDelta (它是0) ★★★
+                            _networkManager.ProcessUpdate(hw, _cfg, timeDelta, isSlowScanTick);
                             continue;
                         }
                         if (hw.HardwareType == HardwareType.Storage && requirements.NeedDisk)
@@ -302,7 +303,7 @@ namespace LiteMonitor.src.SystemServices
             return false;
         }
 
-        private void UpdateTiming()
+        private double UpdateTiming()
         {
             // 1. 统一心跳计数 (假设 UpdateAll 约 1秒调用一次)
             _tickCounter++;
@@ -323,6 +324,8 @@ namespace LiteMonitor.src.SystemServices
                 _secondAccumulator -= 1.0;
                 _secondsCounter++;
             }
+
+            return timeDelta;
         }
 
         private (bool ForceAll, bool NeedCpu, bool NeedGpu, bool NeedMem, bool NeedNet, bool NeedDisk, bool NeedBat, bool NeedMobo, double TimeDelta) CheckUpdateRequirements()

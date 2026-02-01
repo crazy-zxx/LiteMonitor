@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices; // [Added] For P/Invoke
+using System.Diagnostics; // [Added] For Process
 using LiteMonitor.src.SystemServices;
 using LiteMonitor.src.Core;
 
@@ -46,6 +47,9 @@ namespace LiteMonitor.src.SystemServices.InfoService
         private int _lastSecond = -1;
         private string _lastUptimeStr = "";
         private int _lastUptimeMinute = -1;
+        
+        // [Fix] Offset for Fast Startup handling
+        private long _uptimeOffsetTicks = 0;
 
         // [Fix] 使用 QueryUnbiasedInterruptTime 排除休眠时间，解决"开机一天"的问题
         [DllImport("kernel32.dll")]
@@ -63,11 +67,76 @@ namespace LiteMonitor.src.SystemServices.InfoService
                 _data[KEY_TIME] = DateTime.Now.ToString("ddd HH:mm:ss"); // ★★★ 立即赋值当前时间，不再使用 00:00:00 默认值 ★★★
             }
             
+            // [Optimization] 异步执行耗时的进程检查，避免阻塞程序启动或触发杀软扫描导致UI卡顿
+            Task.Run(() => 
+            {
+                CalculateUptimeOffset();
+                // [Fix] 强制让 UpdateTimeInfo 刷新数据，忽略分钟缓存，确保校准结果立即生效
+                _lastUptimeMinute = -1;
+                // 校准完成后立即刷新一次数据，确保界面显示正确
+                UpdateTimeInfo();
+            });
+
             // [Fix] Calculate Uptime immediately so it's ready for first render
+            // (Initial value might be uncorrected for a few ms, which is acceptable)
             UpdateTimeInfo();
 
             // Trigger first async update
             UpdateData();
+        }
+
+        /// <summary>
+        /// 计算开机时间偏差 (解决快速启动不重置问题，同时保留重启后登录等待的时间)
+        /// </summary>
+        private void CalculateUptimeOffset()
+        {
+            try
+            {
+                // 1. 获取当前用户会话时长 (Session Time)
+                // 使用多个锚点进程防止单一进程重启导致误判
+                long minStart = long.MaxValue;
+                foreach (var name in new[] { "explorer", "sihost", "taskhostw" })
+                {
+                    foreach (var p in Process.GetProcessesByName(name))
+                    {
+                        try { if (p.StartTime.Ticks < minStart) minStart = p.StartTime.Ticks; }
+                        catch { }
+                        p.Dispose();
+                    }
+                }
+
+                if (minStart == long.MaxValue) return; // 无法获取会话时间，不进行修正
+
+                long sessionTicks = DateTime.Now.Ticks - minStart;
+                
+                // [Logic] 如果会话时间已经很长 (>10分钟)，说明不是刚开机(可能是睡眠唤醒或一直开着)，
+                // 此时直接信任内核时间，不需要重置。
+                if (sessionTicks > 600L * 1000 * 10000) return;
+
+                // 2. 获取内核非休眠时间 (Unbiased Time)
+                if (!QueryUnbiasedInterruptTime(out ulong unbiasedVal))
+                    unbiasedVal = (ulong)Environment.TickCount64 * 10000;
+                long unbiasedTicks = (long)unbiasedVal;
+
+                // 3. 获取系统物理运行时间 (Wall Clock Uptime)
+                // [Optimization] 直接使用 Environment.TickCount64 (包含休眠时间) 替代查找 System 进程
+                // 这比 Process.GetProcessesByName 更快且无权限问题
+                long wallClockTicks = Environment.TickCount64 * 10000;
+
+                // [Core Logic] 区分 "重启等待" vs "快速启动残留"
+                // Case A (重启等待): 重启 -> 登录界面挂机7h -> 登录。
+                //    WallClock(7h) ≈ Unbiased(7h). 差异很小。 -> 应保留 7h (不修正)。
+                // Case B (快启残留): 昨用5h -> 关机(快启) -> 今开 -> 登录。
+                //    WallClock(24h+) >> Unbiased(5h+). 差异巨大(中间在休眠)。 -> 应显示 0h (修正)。
+                
+                // 判定阈值：如果 物理时间 比 内核时间 多出 30分钟以上，说明中间经历过长时间休眠/关机
+                if (wallClockTicks > unbiasedTicks + 1800L * 1000 * 10000)
+                {
+                    // 确认为快速启动残留，扣除旧时间，从本次会话开始计算
+                    _uptimeOffsetTicks = unbiasedTicks - sessionTicks;
+                }
+            }
+            catch { }
         }
 
         /// <summary>
@@ -155,11 +224,15 @@ namespace LiteMonitor.src.SystemServices.InfoService
             {
                 if (QueryUnbiasedInterruptTime(out ulong ticks))
                 {
-                    ts = TimeSpan.FromTicks((long)ticks);
+                    // [Fix] 减去快速启动导致的偏差
+                    long realTicks = (long)ticks - _uptimeOffsetTicks;
+                    if (realTicks < 0) realTicks = 0;
+                    ts = TimeSpan.FromTicks(realTicks);
                 }
                 else
                 {
                     // Fallback (虽然理论上不会失败)
+                    // TickCount64 无法排除休眠，也无法处理快启，但作为保底
                     ts = TimeSpan.FromMilliseconds(Environment.TickCount64);
                 }
             }

@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using LiteMonitor;
+using LiteMonitor.src.Core;
+using LiteMonitor.src.WebServer;
 using LiteMonitor.src.SystemServices.InfoService;
 
 namespace LiteMonitor.src.Plugins
@@ -300,6 +302,29 @@ namespace LiteMonitor.src.Plugins
             _cts.Clear();
         }
 
+        private bool IsPluginVisible(string instanceId)
+        {
+            var settings = Settings.Load();
+            if (settings?.MonitorItems == null) return false;
+
+            // 1. Web Server Check
+            if (LiteWebServer.Instance != null && LiteWebServer.Instance.IsRunning) return true;
+
+            // 2. Monitor Items Visibility Check
+            string prefix = PluginConstants.DASH_PREFIX + instanceId + ".";
+            lock (settings.MonitorItems)
+            {
+                foreach (var item in settings.MonitorItems)
+                {
+                    if (item.Key.StartsWith(prefix))
+                    {
+                        if (item.VisibleInPanel || item.VisibleInTaskbar) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         private void StartInstance(PluginInstanceConfig inst, PluginTemplate tmpl)
         {
             var cts = new System.Threading.CancellationTokenSource();
@@ -317,6 +342,14 @@ namespace LiteMonitor.src.Plugins
             newTimer.Elapsed += async (s, e) => 
             {
                 if (cts.IsCancellationRequested) return;
+
+                // [Optimization] On-Demand Update: Skip if not visible
+                if (!IsPluginVisible(inst.Id))
+                {
+                    newTimer.Interval = 2000; // Check again in 2s
+                    return;
+                }
+
                 try 
                 {
                     // Execute and get success status

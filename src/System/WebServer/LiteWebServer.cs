@@ -123,6 +123,8 @@ namespace LiteMonitor.src.WebServer
 
             // ★★★ 修复：创建列表副本并加锁，防止遍历时 UI 线程修改集合导致崩溃 ★★★
             List<MonitorItemConfig> itemsCopy;
+            Dictionary<string, int> groupIndices = new Dictionary<string, int>();
+            
             lock (_cfg.MonitorItems)
             {
                 // ★★★ 修复：复用主界面 (Panel模式) 的排序逻辑 ★★★
@@ -131,6 +133,16 @@ namespace LiteMonitor.src.WebServer
                     .OrderBy(g => g.Min(x => x.SortIndex))
                     .SelectMany(g => g.OrderBy(x => x.SortIndex))
                     .ToList();
+
+                // 预计算组顺序索引 (基于排序后的列表)
+                int gIdx = 0;
+                foreach(var item in itemsCopy)
+                {
+                    if (!groupIndices.ContainsKey(item.UIGroup))
+                    {
+                        groupIndices[item.UIGroup] = gIdx++;
+                    }
+                }
             }
 
             string localIp = hw.GetNetworkIP() ?? "127.0.0.1";
@@ -198,7 +210,8 @@ namespace LiteMonitor.src.WebServer
                     // 硬件监控项
                     float? val = hw.Get(item.Key);
 
-                    // [Fix] Restore filtering logic: Skip items with no value (e.g. Battery on Desktop)
+                    // [Fix] 恢复过滤逻辑：跳过没有数据的监控项（如台式机的电池），以符合业务屏蔽需求
+                    // 布局顺序问题已由 CSS order (gidx) 机制解决，即使数据晚到也会插入正确位置
                     if (!val.HasValue) continue;
 
                     if (val.HasValue)
@@ -229,6 +242,8 @@ namespace LiteMonitor.src.WebServer
                 writer.WriteString("n", displayName);
                 writer.WriteString("gid", groupId);
                 writer.WriteString("gn", groupDisplay);
+                // ★★★ 新增：发送组顺序索引，供前端 CSS order 使用 ★★★
+                writer.WriteNumber("gidx", groupIndices.TryGetValue(item.UIGroup, out int idx) ? idx : 999);
                 writer.WriteString("v", valStr);
                 writer.WriteString("u", unit);
                 writer.WriteNumber("pct", pct);

@@ -403,7 +403,8 @@ namespace LiteMonitor.src.WebServer
             items.forEach(i => {
                 const gid = i.gid || 'OTHER';
                 if (!groups[gid]) {
-                    groups[gid] = { name: i.gn, core: null, subs: [], maxSts: 0 };
+                    // ★★★ 修复：读取后端传回的 gidx 用于 CSS 排序 ★★★
+                    groups[gid] = { name: i.gn, core: null, subs: [], maxSts: 0, gidx: (i.gidx !== undefined ? i.gidx : 999) };
                     orderList.push(gid);
                 }
 
@@ -419,12 +420,9 @@ namespace LiteMonitor.src.WebServer
                 }
             });
 
-            // ★★★ 核心修复：确保 DASH 组始终在最上方 ★★★
-            const dashIdx = orderList.indexOf('DASH');
-            if (dashIdx > -1) {
-                orderList.splice(dashIdx, 1);
-                orderList.unshift('DASH');
-            }
+            // ★★★ 核心修复：确保 DASH 组始终在最上方 (现在使用 CSS order，这里不再需要手动调整 orderList) ★★★
+            // const dashIdx = orderList.indexOf('DASH');
+            // if (dashIdx > -1) { ... }
 
             orderList.forEach(gid => {
                 const grp = groups[gid];
@@ -434,6 +432,9 @@ namespace LiteMonitor.src.WebServer
                 if (!cards[gid]) {
                     const div = document.createElement('div');
                     
+                    // ★★★ 核心修复：应用 CSS order 属性，彻底解决乱序问题 ★★★
+                    div.style.order = isDash ? -999 : grp.gidx;
+
                     let content = '';
                     if (isDash) {
                         // DASH 布局
@@ -484,6 +485,9 @@ namespace LiteMonitor.src.WebServer
                 // 更新样式
                 if (!isDash) cards[gid].el.className = `card cs-${grp.maxSts}`;
                 
+                // ★★★ 修复：强制排序 (不再需要，CSS order 已接管) ★★★
+                // board.appendChild(cards[gid].el);
+
                 const cObj = cards[gid];
 
                 if (isDash) {

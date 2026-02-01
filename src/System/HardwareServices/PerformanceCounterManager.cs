@@ -95,26 +95,27 @@ namespace LiteMonitor.src.SystemServices
                     // PerformanceCounter 的机制是计算两次采样的时间差。
                     // 第一次调用 NextValue() 永远返回 0。
                     // 必须在这里先读一次，这样用户在 UI 上第一次看到数据时就是有值的。
-                    _cpuLoadCounter?.NextValue();
-                    _cpuFreqCounter?.NextValue();
-                    _ramAvailableCounter?.NextValue();
-                    _diskReadCounter?.NextValue();
-                    _diskWriteCounter?.NextValue();
-                    _diskActiveCounter?.NextValue();
-                    _uptimeCounter?.NextValue();
+                    // [Fix] 使用 SafeRead 代替直接调用 NextValue，防止某个计数器崩溃导致整个初始化失败 (#268)
                     
-                    _smbClientReadCounter?.NextValue();
-                    _smbClientWriteCounter?.NextValue();
-                    _smbServerReadCounter?.NextValue();
-                    _smbServerWriteCounter?.NextValue();
+                    SafeRead(_cpuLoadCounter);
+                    SafeRead(_cpuFreqCounter);
+                    SafeRead(_ramAvailableCounter);
+                    SafeRead(_diskReadCounter);
+                    SafeRead(_diskWriteCounter);
+                    SafeRead(_diskActiveCounter);
+                    SafeRead(_uptimeCounter);
+                    
+                    SafeRead(_smbClientReadCounter);
+                    SafeRead(_smbClientWriteCounter);
+                    SafeRead(_smbServerReadCounter);
+                    SafeRead(_smbServerWriteCounter);
 
                     IsInitialized = true;
                 }
-                catch (Exception ex)
+                catch
                 {
                     // 初始化失败通常是因为系统组件损坏 (如精简版 Windows)
                     // 这里只记录日志，IsInitialized 保持为 false，上层逻辑会自动回退到 LHM
-                    Debug.WriteLine($"[PerfCounter] 初始化失败: {ex.Message}");
                 }
             });
         }
@@ -220,7 +221,10 @@ namespace LiteMonitor.src.SystemServices
 
             // 增加 10% 的冗余系数，用于抵消 TCP/IP 协议头、SMB 协议头等开销
             // 否则会出现 "下载 600MB 文件，仍显示有 30MB 流量" 的情况
-            const double OverheadFactor = 1.1;
+            // [Fix] 恢复 v1.2.8 的 1.1 系数。虽然理论上 1.0 更准确，但用户反馈 v1.2.8 有效而 v1.3.0 失效，
+            // 可能是因为 PerformanceCounter 的平均值滞后导致 1.0 扣不干净。
+            // [Update] 增加到 1.2 以更激进地扣除，防止剩余 10-20% 的流量
+            const double OverheadFactor = 1.2;
 
             long up = (long)(rate.UpRate * seconds * OverheadFactor);
             long down = (long)(rate.DownRate * seconds * OverheadFactor);
@@ -260,7 +264,8 @@ namespace LiteMonitor.src.SystemServices
             if (pc == null) return null;
             try
             {
-                return pc.NextValue();
+                var val = pc.NextValue();
+                return val;
             }
             catch
             {

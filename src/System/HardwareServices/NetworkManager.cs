@@ -363,14 +363,24 @@ namespace LiteMonitor.src.SystemServices
 
             // ★★★ [新增] 忽略内网流量 (SMB) ★★★
             // 如果用户开启了此选项，且计数器已就绪，则从总流量中扣除 SMB 流量
-            if (cfg.IgnoreSmbTraffic && _perfManager.IsInitialized)
+            if (cfg.IgnoreSmbTraffic)
             {
-                // 获取估算的 SMB 流量 (内部已包含 1.1 倍的协议开销补偿)
-                var smb = _perfManager.GetEstimatedSmbBytes(seconds);
-                
-                // 扣除 (由于采样时间误差，防止扣成负数)
-                if (smb.UpBytes > 0) finalUp = Math.Max(0, finalUp - smb.UpBytes);
-                if (smb.DownBytes > 0) finalDown = Math.Max(0, finalDown - smb.DownBytes);
+                if (_perfManager.IsInitialized)
+                {
+                    // 获取估算的 SMB 流量 (内部已包含 1.1 倍的协议开销补偿)
+                    var smb = _perfManager.GetEstimatedSmbBytes(seconds);
+                    
+                    if (smb.UpBytes > 0 || smb.DownBytes > 0)
+                    {
+                        // 扣除 (由于采样时间误差，防止扣成负数)
+                        if (smb.UpBytes > 0) finalUp = Math.Max(0, finalUp - smb.UpBytes);
+                        if (smb.DownBytes > 0) finalDown = Math.Max(0, finalDown - smb.DownBytes);
+                    }
+                }
+                else
+                {
+                    // Debug.WriteLine("[SMB_DEBUG] IgnoreSmbTraffic=True but PerfManager NOT Initialized!");
+                }
             }
 
             // D. 存入数据
