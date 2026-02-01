@@ -32,6 +32,7 @@ namespace LiteMonitor
         // 判断菜单是否打开
         public bool IsMenuOpen => _currentMenu != null && !_currentMenu.IsDisposed && _currentMenu.Visible;
         
+        private const int WM_RBUTTONDOWN = 0x0204;
         private const int WM_RBUTTONUP = 0x0205;
         private bool _isWin11;
 
@@ -108,7 +109,15 @@ namespace LiteMonitor
 
         protected override void WndProc(ref Message m)
         {
-            if (!_isWin11 && m.Msg == WM_RBUTTONUP)
+            // [Fix] 兼容性修复：在 Win11 25H2 + StartAllBack 环境下，
+            // 右键事件会穿透到原生任务栏。
+            // 因此不再区分系统版本，统一拦截右键按下和抬起消息。
+            if (m.Msg == WM_RBUTTONDOWN)
+            {
+                return; // 吞掉按下事件，防止穿透
+            }
+
+            if (m.Msg == WM_RBUTTONUP)
             {
                 this.BeginInvoke(new Action(ShowContextMenu));
                 return; 
