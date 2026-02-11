@@ -16,13 +16,13 @@ namespace LiteMonitor
             // === 1. 语言判断与文案准备 ===
             bool isZh = LanguageManager.CurrentLang == "zh";
 
-            string strTitle = isZh ? "关于 LiteMonitor" : "About LiteMonitor";
+            string strTitle = LanguageManager.T("Menu.About");
             string strDesc = isZh ? "一款开源的轻量级硬件监控软件。\n© 2025 Diorser / LiteMonitor Project" 
                                   : "A lightweight desktop hardware monitor.\n© 2025 Diorser / LiteMonitor Project";
             string strWebPrefix = isZh ? "官网" : "Website";
-            string strUpdate = isZh ? "检查更新" : "Update?";
-            string strClose = isZh ? "确定" : "OK";
-            string strBug = isZh ? "反馈问题" : "Report Bug";
+            string strUpdate = LanguageManager.T("Menu.CheckUpdate");
+            string strClose = LanguageManager.T("Menu.OK");
+            string strBug = LanguageManager.T("Menu.Feedback");
 
             // === 基础外观 ===
             Text = strTitle;

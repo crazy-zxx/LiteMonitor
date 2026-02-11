@@ -497,20 +497,114 @@ namespace LiteMonitor
             };
             menu.Items.Add(autoStart);
 
-            // === 关于 ===
-            var about = new ToolStripMenuItem(LanguageManager.T("Menu.About"));
-            about.Click += (_, __) => 
+
+            // === 更多 (More) ===
+            var moreRoot = new ToolStripMenuItem(LanguageManager.T("Menu.More"));
+
+            // 1. 打开任务管理器
+            var itemTaskMgr = new ToolStripMenuItem(LanguageManager.T("Menu.ActionTaskMgr"));
+            itemTaskMgr.Click += (_, __) => SystemActions.OpenTaskManager();
+            moreRoot.DropDownItems.Add(itemTaskMgr);
+
+            // 2. 重启资源管理器
+            var itemRestartExp = new ToolStripMenuItem(LanguageManager.T("Menu.RestartExplorer"));
+            itemRestartExp.Click += (_, __) => SystemActions.RestartExplorer();
+            moreRoot.DropDownItems.Add(itemRestartExp);
+
+            moreRoot.DropDownItems.Add(new ToolStripSeparator());
+
+            // 2.1 刷新桌面图标缓存
+            var itemRefreshIcons = new ToolStripMenuItem(LanguageManager.T("Menu.RefreshIcons"));
+            itemRefreshIcons.Click += (_, __) => SystemActions.RefreshIconCache();
+            moreRoot.DropDownItems.Add(itemRefreshIcons);
+
+            // 2.4 清理临时文件
+            var itemCleanTemp = new ToolStripMenuItem(LanguageManager.T("Menu.CleanTemp"));
+            itemCleanTemp.Click += async (_, __) => await SystemActions.CleanTempFilesAsync();
+            moreRoot.DropDownItems.Add(itemCleanTemp);
+
+            moreRoot.DropDownItems.Add(new ToolStripSeparator());
+
+            // 3. 禁止自动休眠 (Toggle)
+            var itemNoSleep = new ToolStripMenuItem(LanguageManager.T("Menu.PreventSleep"))
+            {
+                Checked = SystemActions.IsPreventSleep,
+                CheckOnClick = true
+            };
+            itemNoSleep.Click += (_, __) => 
+            {
+                SystemActions.TogglePreventSleep();
+                itemNoSleep.Checked = SystemActions.IsPreventSleep;
+            };
+            moreRoot.DropDownItems.Add(itemNoSleep);
+
+            // 4. 关闭显示器
+            var itemOffScreen = new ToolStripMenuItem(LanguageManager.T("Menu.TurnOffMonitor"));
+            itemOffScreen.Click += (_, __) => SystemActions.TurnOffMonitor(form.Handle);
+            moreRoot.DropDownItems.Add(itemOffScreen);
+
+            // 5. 定时关机 (Submenu)
+            var itemShutdown = new ToolStripMenuItem(LanguageManager.T("Menu.ScheduledShutdown"));
+            
+            void AddShutdownItem(string label, int seconds)
+            {
+                var sub = new ToolStripMenuItem(label);
+                sub.Click += (_, __) => SystemActions.ScheduleShutdown(seconds);
+                itemShutdown.DropDownItems.Add(sub);
+            }
+            
+            int[] minutes = { 5, 10, 15, 30, 45 };
+            foreach (var m in minutes)
+            {
+                AddShutdownItem(m +" " +LanguageManager.T("Menu.MinutesLater"), m * 60);
+            }
+            
+            int[] hours = { 1, 2, 3, 4, 5, 6, 8, 10 , 12, 24 };
+            foreach (var h in hours)
+            {
+                AddShutdownItem(h + " " + LanguageManager.T("Menu.HoursLater"), h * 3600);
+            }
+
+            itemShutdown.DropDownItems.Add(new ToolStripSeparator());
+            AddShutdownItem(LanguageManager.T("Menu.CancelShutdown"), 0);
+
+            moreRoot.DropDownItems.Add(itemShutdown);
+
+            moreRoot.DropDownItems.Add(new ToolStripSeparator());
+              // 0. 检查更新、反馈、日志、关于
+            var itemCheckUpdate = new ToolStripMenuItem(LanguageManager.T("Menu.CheckUpdate"));
+            itemCheckUpdate.Click += async (_, __) => await UpdateChecker.CheckAsync(true);
+            moreRoot.DropDownItems.Add(itemCheckUpdate);
+
+            var itemFeedback = new ToolStripMenuItem(LanguageManager.T("Menu.Feedback"));
+            itemFeedback.Click += (_, __) => SystemActions.OpenUrl("https://github.com/Diorser/LiteMonitor/issues");
+            moreRoot.DropDownItems.Add(itemFeedback);
+
+            var itemChangelog = new ToolStripMenuItem(LanguageManager.T("Menu.Changelog"));
+            itemChangelog.Click += (_, __) => SystemActions.OpenUrl("https://github.com/Diorser/LiteMonitor/releases");
+            moreRoot.DropDownItems.Add(itemChangelog);
+
+            var itemAbout = new ToolStripMenuItem(LanguageManager.T("Menu.About"));
+            itemAbout.Click += (_, __) => 
             {
                 using (var f = new AboutForm())
                 {
                     f.ShowDialog(form);
                 }
             };
-            menu.Items.Add(about);
+            moreRoot.DropDownItems.Add(itemAbout);
 
+            moreRoot.DropDownItems.Add(new ToolStripSeparator());
+            // 6. 重启软件 (App)
+            var itemRestartApp = new ToolStripMenuItem(LanguageManager.T("Menu.RestartApp"));
+            itemRestartApp.Click += (_, __) => SystemActions.RestartApplication();
+            moreRoot.DropDownItems.Add(itemRestartApp);
+            
+            menu.Items.Add(moreRoot);
             menu.Items.Add(new ToolStripSeparator());
 
-            // === 发现新版本 ===
+
+             // === 发现新版本 ===
             if (UpdateChecker.IsUpdateFound)
             {
                 bool isZh = cfg.Language?.ToLower().Contains("zh") == true;
@@ -529,11 +623,11 @@ namespace LiteMonitor
                 menu.Items.Add(updateItem);
                 menu.Items.Add(new ToolStripSeparator());
             }
-
-            // === 退出 ===
-            var exit = new ToolStripMenuItem(LanguageManager.T("Menu.Exit"));
-            exit.Click += (_, __) => form.Close();
-            menu.Items.Add(exit);
+            // 7. 退出 (App) - 独立一栏放到外面来
+            
+            var itemExit = new ToolStripMenuItem(LanguageManager.T("Menu.Exit"));
+            itemExit.Click += (_, __) => form.Close();
+            menu.Items.Add(itemExit);
 
             return menu;
         }
