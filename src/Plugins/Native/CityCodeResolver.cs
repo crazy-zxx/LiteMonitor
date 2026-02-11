@@ -136,7 +136,12 @@ namespace LiteMonitor.src.Plugins.Native
                     PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                     UseProxy = true,
                     // Use system proxy
-                    Proxy = System.Net.WebRequest.GetSystemWebProxy()
+                    Proxy = System.Net.WebRequest.GetSystemWebProxy(),
+                    // [Fix] Bypass SSL validation for users with problematic certificates/proxies
+                    SslOptions = new System.Net.Security.SslClientAuthenticationOptions 
+                    {
+                        RemoteCertificateValidationCallback = delegate { return true; }
+                    }
                 };
 
                 using (var client = new HttpClient(handler))

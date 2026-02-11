@@ -44,10 +44,23 @@ namespace LiteMonitor.src.UI.Helpers
 
             if (isAttached)
             {
-                POINT pt = new POINT { X = left, Y = top };
-                ScreenToClient(taskbarHandle, ref pt);
-                finalX = pt.X;
-                finalY = pt.Y;
+                // [Fix #292] Use GetWindowRect for manual relative coordinate calculation
+                // This avoids potential ScreenToClient drift issues on multi-monitor setups during startup
+                // ScreenToClient relies on the window's internal state which might be unstable during init
+                if (GetWindowRect(taskbarHandle, out RECT parentRect))
+                {
+                    finalX = left - parentRect.left;
+                    finalY = top - parentRect.top;
+                }
+                else
+                {
+                    // Fallback mechanism
+                    POINT pt = new POINT { X = left, Y = top };
+                    ScreenToClient(taskbarHandle, ref pt);
+                    finalX = pt.X;
+                    finalY = pt.Y;
+                }
+
                 SetWindowPos(_form.Handle, IntPtr.Zero, finalX, finalY, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
             }
             else

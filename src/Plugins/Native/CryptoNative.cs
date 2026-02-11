@@ -14,6 +14,25 @@ namespace LiteMonitor.src.Plugins.Native
         // 我这里使用一个占位符，用户需要在 Crypto.json 中配置，或者在这里硬编码。
         // 为了灵活性，我们尽量通过参数传递 Fallback URL。
 
+        private static HttpClient CreateClient(TimeSpan timeout)
+        {
+            var handler = new SocketsHttpHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+                UseProxy = true,
+                Proxy = System.Net.WebRequest.GetSystemWebProxy(),
+                SslOptions = new System.Net.Security.SslClientAuthenticationOptions 
+                {
+                    RemoteCertificateValidationCallback = delegate { return true; }
+                }
+            };
+            var client = new HttpClient(handler);
+            client.Timeout = timeout;
+            client.DefaultRequestHeaders.Add("User-Agent", "LiteMonitor/1.0");
+            return client;
+        }
+
         public static async Task<string> FetchAsync(string symbol, string fallbackUrl)
         {
             // 1. 规范化 Symbol (参考 Worker 逻辑)
@@ -25,9 +44,8 @@ namespace LiteMonitor.src.Plugins.Native
             try
             {
                 string bybitUrl = $"https://api.bybit.com/v5/market/tickers?category=spot&symbol={symbol}";
-                using (var client = new HttpClient())
+                using (var client = CreateClient(TimeSpan.FromSeconds(3))) // 直连超时要短
                 {
-                    client.Timeout = TimeSpan.FromSeconds(3); // 直连超时要短，以便快速切换
                     var resp = await client.GetAsync(bybitUrl);
                     resp.EnsureSuccessStatusCode();
                     
@@ -57,9 +75,8 @@ namespace LiteMonitor.src.Plugins.Native
                         targetUrl += (targetUrl.Contains("?") ? "&" : "?") + $"symbol={symbol}";
                     }
 
-                    using (var client = new HttpClient())
+                    using (var client = CreateClient(TimeSpan.FromSeconds(10)))
                     {
-                        client.Timeout = TimeSpan.FromSeconds(10);
                         var response = await client.GetAsync(targetUrl);
                         response.EnsureSuccessStatusCode();
                         return await response.Content.ReadAsStringAsync();
