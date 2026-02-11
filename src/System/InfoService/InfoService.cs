@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices; // [Added] For P/Invoke
 using System.Diagnostics; // [Added] For Process
+using System.Net.NetworkInformation; // [Added] For NetworkChange
 using LiteMonitor.src.SystemServices;
 using LiteMonitor.src.Core;
 
@@ -66,6 +67,12 @@ namespace LiteMonitor.src.SystemServices.InfoService
                 _data[KEY_IP]   = DEFAULT_IP;
                 _data[KEY_TIME] = DateTime.Now.ToString("ddd HH:mm:ss"); // ★★★ 立即赋值当前时间，不再使用 00:00:00 默认值 ★★★
             }
+            
+            // [Fix #287] 监听网络变更，立即触发IP刷新
+            NetworkChange.NetworkAddressChanged += (s, e) => {
+                _currentInterval = INTERVAL_FAST;
+                _lastUpdateTick = 0; // 强制下次 Update 立即执行
+            };
             
             // [Optimization] 异步执行耗时的进程检查，避免阻塞程序启动或触发杀软扫描导致UI卡顿
             Task.Run(() => 

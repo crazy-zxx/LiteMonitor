@@ -32,6 +32,7 @@ namespace LiteMonitor.src.SystemServices
         private readonly DateTime _startTime = DateTime.Now; // 启动时间
         private static string _staticIPCache = "";// [修改] 增加IP静态缓存，切换主题/重启服务时不丢失，解决闪烁问题
         private static DateTime _lastIPCheckTime = DateTime.MinValue; // 上次检查IP的时间
+        private volatile bool _shouldResetAdapters = false; // [Fix #287] 网络变更标记
 
         // ★★★ 依赖注入：性能计数器 (用于获取 SMB 流量) ★★★
         private readonly PerformanceCounterManager _perfManager;
@@ -40,6 +41,13 @@ namespace LiteMonitor.src.SystemServices
         {
             // 允许为空 (为了兼容性)，如果为空则内部功能自动禁用
             _perfManager = perfManager ?? new PerformanceCounterManager(); 
+            
+            // [Fix #287] 监听网络地址变更事件，强制刷新 IP 和 网卡缓存
+            // 当用户切换 WIFI 或插拔网线时，IP地址和网卡实例都会失效，必须重置
+            NetworkChange.NetworkAddressChanged += (s, e) => {
+                _staticIPCache = null; 
+                _shouldResetAdapters = true;
+            };
         }
 
         public void ClearCache()
@@ -77,6 +85,25 @@ namespace LiteMonitor.src.SystemServices
         // [新增] 获取当前 IP (带 10秒 缓存)
         public string GetCurrentIP()
         {
+            // [Fix #287] 如果网络发生了变更，强制重置所有网卡状态
+            // 这会迫使 MatchNativeNetworkAdapter 重新寻找最新的 NetworkInterface 实例 (获取正确的新IP)
+            if (_shouldResetAdapters)
+            {
+                try
+                {
+                    foreach (var state in _netStates.Values)
+                    {
+                        state.NativeAdapter = null;
+                        state.LastMatchAttempt = DateTime.MinValue; // 允许立即重新匹配
+                    }
+                    _shouldResetAdapters = false;
+                }
+                catch 
+                { 
+                    // 忽略并发修改异常，保留标志位下次重试
+                }
+            }
+
             // 1. 缓存保护：只有当缓存了【有效IP】且距离上次检查不到 30 秒时，才直接返回
             // 关键修改：如果 _staticIPCache 是空的，忽略时间限制，强制重试
             if (!string.IsNullOrEmpty(_staticIPCache) && (DateTime.Now - _lastIPCheckTime).TotalSeconds < 30)
@@ -160,6 +187,10 @@ namespace LiteMonitor.src.SystemServices
                     {
                         string ipStr = ip.Address.ToString();
                         
+                        // [Fix #287] 忽略 APIPA (169.254.x.x) 地址
+                        // 这些地址通常是 DHCP 失败时的临时地址，会导致网页版服务绑定错误
+                        if (ipStr.StartsWith("169.254.")) continue;
+
                         // [Fix #206] 优先返回 192.168.x.x 类型的内网 IP
                         if (ipStr.StartsWith("192.168."))
                         {
