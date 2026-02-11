@@ -221,6 +221,12 @@ namespace LiteMonitor.src.UI.Helpers
                 int x = _cfg.Position.X;
                 int y = _cfg.Position.Y;
                 SetSafeLocation(area, x, y);
+                
+                // [Fix #288] 恢复位置后，重置隐藏状态，并让 Timer 重新接管
+                // 防止之前是 Hidden 状态，恢复后 Location 变了但 _isHidden 仍为 true，导致自动隐藏逻辑失效
+                _isHidden = false;
+                _dock = DockEdge.None;
+                KeepVisible(0.5); // 短暂保持可见，让用户确认位置，随后由 Timer 自动隐藏
             }
             else
             {

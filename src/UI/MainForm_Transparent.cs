@@ -20,6 +20,8 @@ namespace LiteMonitor
         private readonly MainFormWinHelper _winHelper;
         private readonly MainFormBizHelper _bizHelper;
         private readonly int _wmTaskbarCreated;
+        private const int WM_DISPLAYCHANGE = 0x007E;
+        private CancellationTokenSource _displayChangeCts;
 
         private Point _dragOffset;
         private bool _uiDragging = false;
@@ -246,6 +248,24 @@ namespace LiteMonitor
                     }));
                 }
             }
+
+            if (m.Msg == WM_DISPLAYCHANGE)
+            {
+                // [Fix #288] 分辨率改变后，延迟执行位置恢复，确保 Screen.AllScreens 已完全更新
+                // 增加防抖机制，避免短时间内多次触发
+                _displayChangeCts?.Cancel();
+                _displayChangeCts = new System.Threading.CancellationTokenSource();
+                var token = _displayChangeCts.Token;
+
+                Task.Delay(500, token).ContinueWith(t => 
+                {
+                    if (!t.IsCanceled)
+                    {
+                        this.BeginInvoke(new Action(() => _bizHelper?.RestorePos()));
+                    }
+                });
+            }
+
             base.WndProc(ref m);
         }
 
